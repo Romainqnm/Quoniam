@@ -1,6 +1,6 @@
-# gammes.py - BANQUE DE DONNEES v3.0
+# gammes.py - BANQUE DE DONNEES v4.5
 
-# --- PACK 1 : ÉLÉMENTS (Organique) ---
+# --- PACK 1 : ÉLÉMENTS ---
 PACK_ELEMENTS = {
     "eau": [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 75, 77, 79, 82],
     "air": [45, 47, 48, 52, 53, 57, 59, 60, 64, 65, 69, 71, 72, 76, 77],
@@ -9,7 +9,7 @@ PACK_ELEMENTS = {
     "espace": [48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76]
 }
 
-# --- PACK 2 : SAISONS (Évocateur) ---
+# --- PACK 2 : SAISONS ---
 PACK_SAISONS = {
     "hiver": [72, 74, 76, 77, 79, 81, 83, 84, 86, 88, 89, 91, 93, 95, 96],
     "printemps": [60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86, 88, 91, 93],
@@ -18,5 +18,14 @@ PACK_SAISONS = {
     "vide": [48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76]
 }
 
-# Le registre global pour que le moteur s'y retrouve
-TOUTES_GAMMES = {**PACK_ELEMENTS, **PACK_SAISONS}
+# --- PACK 3 : ATMOSPHÈRES (C'était ça qui manquait !) ---
+PACK_ATMOS = {
+    "zen": [48, 50, 53, 55, 57, 60, 62, 65, 67, 69, 72, 74, 77, 79, 81],
+    "cyber": [36, 39, 41, 43, 46, 48, 51, 53, 55, 58, 60, 63, 65, 67, 70],
+    "lofi": [48, 51, 53, 55, 56, 58, 60, 63, 65, 67, 68, 70, 72, 75, 77],
+    "jungle": [48, 50, 52, 55, 57, 60, 62, 64, 67, 69, 72, 74, 76, 79, 81],
+    "indus": [36, 42, 43, 48, 49, 54, 55, 60, 61, 66, 67, 72, 73, 78, 79]
+}
+
+# Registre Global
+TOUTES_GAMMES = {**PACK_ELEMENTS, **PACK_SAISONS, **PACK_ATMOS}
