@@ -1,9 +1,10 @@
 import flet as ft
-from main import ETAT, main as lancer_moteur_sonore
 import threading
+import main as moteur_audio # On importe le moteur pour le lancer
+import config               # On importe la config partagée
 
 def main(page: ft.Page):
-    page.title = "QUONIAM Lab v1.4"
+    page.title = "QUONIAM Lab v1.5"
     page.theme_mode = ft.ThemeMode.DARK
     page.window_width = 450
     page.window_height = 750
@@ -21,7 +22,7 @@ def main(page: ft.Page):
 
     def changer_preset(e):
         code = e.control.data
-        ETAT["preset"] = code
+        config.ETAT["preset"] = code # On écrit dans config
         
         if code == "eau":
             txt_icone.value = "💧"
@@ -42,24 +43,24 @@ def main(page: ft.Page):
             slider_vitesse.value = 70
             slider_intensite.value = 50
 
-        ETAT["vitesse"] = slider_vitesse.value
-        ETAT["intensite"] = slider_intensite.value
+        config.ETAT["vitesse"] = slider_vitesse.value
+        config.ETAT["intensite"] = slider_intensite.value
         mise_a_jour_labels()
 
     def on_slider_change(e):
-        ETAT["vitesse"] = slider_vitesse.value
-        ETAT["intensite"] = slider_intensite.value
+        config.ETAT["vitesse"] = slider_vitesse.value
+        config.ETAT["intensite"] = slider_intensite.value
         mise_a_jour_labels()
 
     def toggle_play(e):
-        ETAT["actif"] = not ETAT["actif"]
-        btn_play.text = "⏸ PAUSE" if ETAT["actif"] else "▶ REPRENDRE"
-        btn_play.bgcolor = "#B71C1C" if ETAT["actif"] else "#2E7D32"
+        config.ETAT["actif"] = not config.ETAT["actif"]
+        btn_play.text = "⏸ PAUSE" if config.ETAT["actif"] else "▶ REPRENDRE"
+        btn_play.bgcolor = "#B71C1C" if config.ETAT["actif"] else "#2E7D32"
         page.update()
 
-    # UI
+    # UI (Identique à avant)
     titre = ft.Text("QUONIAM", size=40, font_family="Roboto Mono", weight="w100")
-    sous_titre = ft.Text("v1.4 Multiverse", color="#9E9E9E")
+    sous_titre = ft.Text("v1.5 Modular", color="#9E9E9E")
     txt_icone = ft.Text("💧", size=80, text_align="center")
     txt_ambiance = ft.Text("RIVIÈRE (Marimba)", size=16, weight="bold", color="#64B5F6")
 
@@ -98,11 +99,7 @@ def main(page: ft.Page):
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER))
 
 if __name__ == "__main__":
-    # On lance l'interface d'abord !
-    print("Lancement de l'interface...")
-    
-    # Le thread audio démarrera en parallèle sans bloquer l'import
-    thread_son = threading.Thread(target=lancer_moteur_sonore, daemon=True)
+    print("Lancement de l'interface modulaire...")
+    thread_son = threading.Thread(target=moteur_audio.main, daemon=True)
     thread_son.start()
-    
     ft.app(target=main)

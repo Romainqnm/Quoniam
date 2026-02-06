@@ -1,19 +1,8 @@
-# QUONIAM ENGINE v1.4 - LAZY LOADING
+# main.py - MOTEUR AUDIO v1.5 (MODULAIRE)
 from scamp import Session, wait
 import random
-
-# --- 1. CONFIGURATION PARTAGÉE ---
-ETAT = {
-    "actif": True,
-    "preset": "eau",
-    "vitesse": 50,     
-    "intensite": 30,   
-}
-
-# --- 2. DONNÉES MUSICALES (Légères, on peut les laisser ici) ---
-GAMME_EAU = [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 75, 77, 79, 82]
-GAMME_AIR = [45, 47, 48, 52, 53, 57, 59, 60, 64, 65, 69, 71, 72, 76, 77]
-GAMME_FEU = [48, 51, 53, 54, 55, 58, 60, 63, 65, 66, 67, 70, 72, 75, 77]
+import config      # On importe le fichier config.py
+import gammes      # On importe le fichier gammes.py
 
 def trouver_note_proche(note_actuelle, gamme, direction):
     try:
@@ -25,39 +14,40 @@ def trouver_note_proche(note_actuelle, gamme, direction):
         return 60
 
 def main():
-    print("--- DÉMARRAGE DU MOTEUR AUDIO (THREAD) ---")
+    print("--- DÉMARRAGE DU MOTEUR AUDIO ---")
     
-    # --- CHARGEMENT LOURD (Déplacé ICI) ---
-    # C'est maintenant que ça charge, pendant que l'interface est déjà ouverte
+    # Initialisation SCAMP
     s = Session(tempo=120)
     
-    print("... Chargement des instruments (Patience) ...")
+    # Chargement des instruments
     instruments = {
         "eau": s.new_part("Marimba"),
         "air": s.new_part("Electric Piano"),
         "feu": s.new_part("Acoustic Guitar")
     }
-    print("--- MOTEUR AUDIO PRÊT ---")
-
+    
+    print("--- MOTEUR PRÊT ---")
     note_courante = 60 
     
     while True:
         try:
-            if not ETAT["actif"]:
+            # On lit l'état depuis le module config
+            if not config.ETAT["actif"]:
                 wait(0.1)
                 continue
 
-            preset_actuel = ETAT["preset"]
-            valeur_vitesse = ETAT["vitesse"]
-            valeur_intensite = ETAT["intensite"]
+            preset_actuel = config.ETAT["preset"]
+            valeur_vitesse = config.ETAT["vitesse"]
+            valeur_intensite = config.ETAT["intensite"]
 
             inst_actuel = instruments[preset_actuel]
             
-            if preset_actuel == "eau": gamme = GAMME_EAU
-            elif preset_actuel == "air": gamme = GAMME_AIR
-            else: gamme = GAMME_FEU
+            # Sélection de la gamme via le module gammes
+            if preset_actuel == "eau": gamme = gammes.EAU
+            elif preset_actuel == "air": gamme = gammes.AIR
+            else: gamme = gammes.FEU
 
-            # Logique de jeu
+            # --- Logique Audio (inchangée) ---
             facteur = 1.5 if preset_actuel == "air" else 1.0
             attente = (0.8 - (valeur_vitesse / 150.0)) * facteur
             if attente < 0.05: attente = 0.05
