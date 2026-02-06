@@ -1,10 +1,10 @@
-# config.py - L'ÉTAT PARTAGÉ v1.6
+# config.py - ÉTAT PARTAGÉ v1.8
 ETAT = {
     "actif": True,
-    "preset": "eau",
-    "vitesse": 50,     # 0-100
-    "intensite": 30,   # 0-100
-    # NOUVEAUX PARAMÈTRES
-    "gravite": 0,      # -2 (Basses) à +2 (Aigus)
-    "chaos": 20        # 0 (Ordonné) à 100 (Fou)
+    "mode_auto": False, # NOUVEAU : Si True, le logiciel choisit seul
+    "preset": "eau",   
+    "vitesse": 50,     
+    "intensite": 30,   
+    "gravite": 0,      
+    "chaos": 20        
 }
