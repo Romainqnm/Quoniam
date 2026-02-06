@@ -1,16 +1,22 @@
-# gammes.py - BIBLIOTHÈQUE v1.8
+# gammes.py - BANQUE DE DONNEES v3.0
 
-# EAU : Pentatonique Mineure (Fluide, Naturel)
-EAU = [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 75, 77, 79, 82]
+# --- PACK 1 : ÉLÉMENTS (Organique) ---
+PACK_ELEMENTS = {
+    "eau": [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 75, 77, 79, 82],
+    "air": [45, 47, 48, 52, 53, 57, 59, 60, 64, 65, 69, 71, 72, 76, 77],
+    "feu": [48, 51, 53, 54, 55, 58, 60, 63, 65, 66, 67, 70, 72, 75, 77],
+    "terre": [36, 38, 40, 43, 45, 48, 50, 52, 55, 57, 60, 62, 64, 67, 69],
+    "espace": [48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76]
+}
 
-# AIR : Hirajoshi (Aérien, Mystérieux)
-AIR = [45, 47, 48, 52, 53, 57, 59, 60, 64, 65, 69, 71, 72, 76, 77]
+# --- PACK 2 : SAISONS (Évocateur) ---
+PACK_SAISONS = {
+    "hiver": [72, 74, 76, 77, 79, 81, 83, 84, 86, 88, 89, 91, 93, 95, 96],
+    "printemps": [60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86, 88, 91, 93],
+    "ete": [48, 50, 52, 53, 55, 57, 58, 60, 62, 64, 65, 67, 69, 70, 72],
+    "automne": [48, 50, 51, 53, 55, 56, 58, 60, 62, 63, 65, 67, 68, 70, 72],
+    "vide": [48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76]
+}
 
-# FEU : Blues/Jazz (Chaleureux, Urbain)
-FEU = [48, 51, 53, 54, 55, 58, 60, 63, 65, 66, 67, 70, 72, 75, 77]
-
-# TERRE : Majeure Naturelle (Stable, Ancré, Violoncelle)
-TERRE = [36, 38, 40, 43, 45, 48, 50, 52, 55, 57, 60, 62, 64, 67, 69]
-
-# ESPACE : Gamme par tons (Flottante, Sans gravité, Sci-Fi)
-ESPACE = [48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76]
+# Le registre global pour que le moteur s'y retrouve
+TOUTES_GAMMES = {**PACK_ELEMENTS, **PACK_SAISONS}
