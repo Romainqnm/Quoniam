@@ -6,25 +6,44 @@ import config
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM Hub v4.5 Clean"
+    page.title = "QUONIAM v4.9.1 Final Polish"
     page.theme_mode = ft.ThemeMode.DARK
     page.window_width = 450
     page.window_height = 800
     page.padding = 0 
     
-    gradient_bg = ft.LinearGradient(
-        begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1),
-        colors=["#0f0c29", "#302b63", "#24243e"]
-    )
+    # PALETTES DE COULEURS
+    COLORS_ELEMENTS = ["#0f0c29", "#302b63", "#24243e"]
+    COLORS_SAISONS  = ["#134E5E", "#71B280"] 
+    COLORS_ATMOS    = ["#480048", "#C04848"] 
 
     # --- VARIABLES ---
     txt_icone = ft.Text("💧", size=50)
     
+    # L'AURA (GLOW)
+    glow_shadow = ft.BoxShadow(
+        spread_radius=0,
+        blur_radius=20,
+        color=ft.Colors.with_opacity(0.5, "cyan"),
+        offset=ft.Offset(0, 0),
+        blur_style="outer" 
+    )
+
+    # CONTENEUR ANIMÉ
     container_icone = ft.Container(
         content=txt_icone,
         alignment=ft.Alignment(0, 0), 
         scale=1.0, 
-        animate_scale=ft.Animation(600, ft.AnimationCurve.EASE_IN_OUT)
+        rotate=ft.Rotate(0, alignment=ft.Alignment(0,0)), 
+        shadow=glow_shadow,
+        # LE FIX EST ICI : On arrondit les angles au max pour faire un cercle
+        # Un cercle qui tourne sur lui-même ne montre pas de coins !
+        border_radius=100, 
+        width=100, # On fixe une taille pour être sûr que c'est un rond parfait
+        height=100,
+        
+        animate_scale=ft.Animation(600, ft.AnimationCurve.EASE_IN_OUT),
+        animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
 
     lbl_vitesse = ft.Text("50%", size=12)
@@ -40,14 +59,23 @@ def main(page: ft.Page):
         gradient=ft.LinearGradient(colors=["#56ab2f", "#a8e063"]) 
     )
 
-    container_presets = ft.Container() 
+    container_presets = ft.Container()
+    
+    # LE FOND LIQUIDE
+    main_layout = ft.Container(
+        gradient=ft.LinearGradient(begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1), colors=COLORS_ELEMENTS), 
+        expand=True, 
+        padding=20,
+        animate=ft.Animation(2000, ft.AnimationCurve.EASE_OUT_CUBIC),
+        content=None
+    )
 
     # --- HEADER ---
     def creer_header():
         return ft.Column([
             ft.Text("Q U O N I A M", size=30, weight=ft.FontWeight.BOLD, color="white", text_align=ft.TextAlign.CENTER),
             ft.Container(
-                content=ft.Text("L I V I N G   P U L S E", size=10, weight=ft.FontWeight.W_300, color="#88ffffff"),
+                content=ft.Text("F L U I D   D Y N A M I C S", size=10, weight=ft.FontWeight.W_300, color="#88ffffff"),
                 margin=ft.margin.only(top=5)
             ),
             ft.Container(width=40, height=2, bgcolor="#44ffffff", margin=ft.margin.only(top=15, bottom=5), border_radius=10)
@@ -55,18 +83,55 @@ def main(page: ft.Page):
 
     # --- BOUCLE D'ANIMATION ---
     def animer_coeur():
+        angle = 0
         while True:
             if config.ETAT["collection"] is not None and config.ETAT["actif"]:
-                container_icone.scale = 1.2
-                container_icone.update()
                 
-                tempo = 2.0 - (config.ETAT["vitesse"] / 60.0)
-                tempo = max(0.3, tempo)
+                vitesse = config.ETAT["vitesse"]
+                intensite = config.ETAT["intensite"]
+                preset = config.ETAT["preset"]
+                
+                tempo_base = 2.0 - (vitesse / 55.0)
+                tempo = max(0.35, tempo_base)
+                
+                scale_max = 1.0 + (intensite / 250.0) 
+                
+                nervous_presets = ["feu", "cyber", "indus", "ete"]
+                if preset in nervous_presets:
+                    container_icone.animate_scale = ft.Animation(int(tempo*500), ft.AnimationCurve.ELASTIC_OUT)
+                else:
+                    container_icone.animate_scale = ft.Animation(int(tempo*900), ft.AnimationCurve.EASE_IN_OUT)
+
+                # PHASE 1 : SYSTOLE
+                container_icone.scale = scale_max
+                
+                presets_tournants = ["espace", "vide", "cyber", "indus", "zen"]
+                if preset in presets_tournants:
+                    angle += 0.5 
+                    container_icone.rotate.angle = angle
+                else:
+                    container_icone.rotate.angle = 0
+                
+                # Aura
+                container_icone.shadow.spread_radius = 5 + (intensite/10)
+                container_icone.shadow.color = ft.Colors.with_opacity(0.8, "white")
+                
+                container_icone.update()
                 time.sleep(tempo)
                 
+                # PHASE 2 : DIASTOLE
                 container_icone.scale = 1.0
+                
+                if preset in presets_tournants:
+                    angle += 0.5
+                    container_icone.rotate.angle = angle
+                
+                container_icone.shadow.spread_radius = 0
+                container_icone.shadow.color = ft.Colors.with_opacity(0.3, "white")
+                
                 container_icone.update()
                 time.sleep(tempo)
+                
             else:
                 time.sleep(1.0)
 
@@ -123,34 +188,46 @@ def main(page: ft.Page):
 
     def charger_interface_controle(nom_collection):
         config.ETAT["collection"] = nom_collection
+        
         if nom_collection == "elements":
             config.ETAT["preset"] = "eau"
             presets_controls = creer_boutons_elements()
+            main_layout.gradient.colors = COLORS_ELEMENTS
+            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "cyan") 
+            
         elif nom_collection == "saisons":
             config.ETAT["preset"] = "hiver"
             presets_controls = creer_boutons_saisons()
+            main_layout.gradient.colors = COLORS_SAISONS
+            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "green") 
+            
         else:
             config.ETAT["preset"] = "zen"
             presets_controls = creer_boutons_atmos()
+            main_layout.gradient.colors = COLORS_ATMOS
+            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "purple") 
             
         container_presets.content = presets_controls
-        page.clean()
-        page.add(creer_vue_controle())
+        
+        main_layout.content = creer_contenu_controle()
+        main_layout.update()
+        
         config.ETAT["actif"] = True 
         update_ui()
 
     def retour_accueil(e):
         config.ETAT["collection"] = None
         config.ETAT["actif"] = False 
-        page.clean()
-        page.add(creer_vue_accueil())
+        
+        main_layout.gradient.colors = COLORS_ELEMENTS
+        main_layout.content = creer_contenu_accueil()
+        main_layout.update()
         page.update()
 
     # --- VUES ---
-
-    def creer_vue_accueil():
+    
+    def creer_contenu_accueil():
         def carte(emoji, titre, sous_titre, code):
-            # CORRECTION ICI : ft.Border.all (Majuscule B) au lieu de ft.border.all
             return ft.Container(
                 content=ft.Column([
                     ft.Text(emoji, size=35),
@@ -162,25 +239,22 @@ def main(page: ft.Page):
                 border=ft.Border.all(1, "#33ffffff")
             )
         
-        return ft.Container(
-            gradient=gradient_bg, expand=True, padding=20,
-            content=ft.Column([
-                ft.Container(height=40),
-                creer_header(),
-                ft.Container(height=60),
-                ft.Text("CHOISISSEZ VOTRE MONDE", size=12, color="#88ffffff"),
-                ft.Container(height=20),
-                ft.Row([
-                    carte("🌱", "ÉLÉMENTS", "Nature", "elements"),
-                    carte("❄️", "SAISONS", "Voyage", "saisons"),
-                    carte("🎋", "ATMOS", "Exotique", "atmos")
-                ], alignment="center", spacing=15),
-                ft.Container(expand=True),
-                ft.Text("v4.5 Clean", size=10, color="#44ffffff")
-            ], horizontal_alignment="center")
-        )
+        return ft.Column([
+            ft.Container(height=40),
+            creer_header(),
+            ft.Container(height=60),
+            ft.Text("CHOISISSEZ VOTRE MONDE", size=12, color="#88ffffff"),
+            ft.Container(height=20),
+            ft.Row([
+                carte("🌱", "ÉLÉMENTS", "Nature", "elements"),
+                carte("❄️", "SAISONS", "Voyage", "saisons"),
+                carte("🎋", "ATMOS", "Exotique", "atmos")
+            ], alignment="center", spacing=15),
+            ft.Container(expand=True),
+            ft.Text("v4.9.1 Final Polish", size=10, color="#44ffffff")
+        ], horizontal_alignment="center")
 
-    def creer_vue_controle():
+    def creer_contenu_controle():
         bouton_retour = ft.Container(
             content=ft.Text("⬅️  RETOUR", size=12, weight="bold", color="white"),
             padding=10, border_radius=10, ink=True, on_click=retour_accueil
@@ -194,27 +268,23 @@ def main(page: ft.Page):
             ft.Container(width=70) 
         ])
 
-        return ft.Container(
-            gradient=gradient_bg, expand=True, padding=20,
-            content=ft.Column([
-                ft.Container(height=10),
-                header_nav,
-                ft.Container(height=10),
-                container_icone, 
-                ft.Container(height=20),
-                container_presets, 
-                ft.Container(height=20),
-                creer_panneau_sliders(),
-                ft.Container(expand=True),
-                btn_play_container,
-                ft.Container(height=20),
-            ], horizontal_alignment="center", scroll=ft.ScrollMode.HIDDEN)
-        )
+        return ft.Column([
+            ft.Container(height=10),
+            header_nav,
+            ft.Container(height=10),
+            container_icone, 
+            ft.Container(height=20),
+            container_presets, 
+            ft.Container(height=20),
+            creer_panneau_sliders(),
+            ft.Container(expand=True),
+            btn_play_container,
+            ft.Container(height=20),
+        ], horizontal_alignment="center", scroll=ft.ScrollMode.HIDDEN)
 
     # --- HELPERS BOUTONS ---
     
     def btn_preset(icon, nom, code):
-        # CORRECTION ICI AUSSI
         return ft.Container(
             content=ft.Column([ft.Text(icon, size=20), ft.Text(nom, size=9, color="white")], alignment="center"),
             data=code, on_click=changer_preset,
@@ -271,10 +341,12 @@ def main(page: ft.Page):
             padding=15
         )
 
-    page.add(creer_vue_accueil())
+    # Lancement
+    main_layout.content = creer_contenu_accueil()
+    page.add(main_layout)
 
 if __name__ == "__main__":
-    print("Lancement v4.5 Clean...")
+    print("Lancement v4.9.1 Final Polish...")
     thread_son = threading.Thread(target=moteur_audio.main, daemon=True)
     thread_son.start()
     ft.app(target=main)
