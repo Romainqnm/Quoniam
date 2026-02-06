@@ -1,7 +1,7 @@
-# main.py - MOTEUR AUDIO v1.8 (ADAPTATIF)
+# main.py - MOTEUR AUDIO v2.2 (SMART AUTOMATION)
 from scamp import Session, wait
 import random
-import datetime # Pour lire l'heure
+import datetime
 import config
 import gammes
 
@@ -17,33 +17,53 @@ def trouver_note_proche(note_actuelle, gamme, direction, facteur_chaos):
     except ValueError:
         return 60
 
+def appliquer_profil(preset, vitesse, intensite, chaos, gravite):
+    """Applique un profil complet de réglages"""
+    if config.ETAT["preset"] != preset:
+        print(f"--- AUTO : Passage à {preset.upper()} ---")
+        config.ETAT["preset"] = preset
+    
+    # On lisse les transitions (on ne change pas tout d'un coup brutalement)
+    # Ici on applique directement pour l'exemple, mais on pourrait faire une interpolation
+    config.ETAT["vitesse"] = vitesse
+    config.ETAT["intensite"] = intensite
+    config.ETAT["chaos"] = chaos
+    config.ETAT["gravite"] = gravite
+
 def gerer_mode_auto():
-    """Change le preset en fonction de l'heure réelle"""
+    """Cerveau Circadien : Adapte tout le son à l'heure"""
     heure = datetime.datetime.now().hour
     
-    # Logique Circadienne
-    if 6 <= heure < 10:   nouveau = "terre"  # Réveil calme (6h-10h)
-    elif 10 <= heure < 14: nouveau = "feu"    # Productivité (10h-14h)
-    elif 14 <= heure < 19: nouveau = "air"    # Flow créatif (14h-19h)
-    elif 19 <= heure < 23: nouveau = "eau"    # Détente (19h-23h)
-    else:                  nouveau = "espace" # Nuit profonde (23h-6h)
-    
-    # On applique seulement si ça change
-    if config.ETAT["preset"] != nouveau:
-        print(f"--- AUTO : Passage à l'ambiance {nouveau.upper()} ---")
-        config.ETAT["preset"] = nouveau
+    # MATIN (6h-10h) : Terre (Ancrage, lent mais intense)
+    if 6 <= heure < 10:
+        appliquer_profil("terre", vitesse=30, intensite=50, chaos=10, gravite=0)
+        
+    # TRAVAIL (10h-14h) : Feu (Energie, rapide, précis)
+    elif 10 <= heure < 14:
+        appliquer_profil("feu", vitesse=70, intensite=60, chaos=20, gravite=0)
+        
+    # FLOW CRÉATIF (14h-18h) : Air (Léger, rapide, un peu fou)
+    elif 14 <= heure < 18:
+        appliquer_profil("air", vitesse=60, intensite=40, chaos=40, gravite=1)
+        
+    # DÉTENTE (18h-23h) : Eau (Fluide, calme)
+    elif 18 <= heure < 23:
+        appliquer_profil("eau", vitesse=40, intensite=30, chaos=15, gravite=0)
+        
+    # NUIT PROFONDE (23h-6h) : Espace (Lent, nappes, grave et onirique)
+    else:
+        appliquer_profil("espace", vitesse=20, intensite=40, chaos=80, gravite=-1)
 
 def main():
-    print("--- DÉMARRAGE v1.8 ---")
+    print("--- DÉMARRAGE MOTEUR v2.2 ---")
     s = Session(tempo=120)
     
-    # NOUVELLE PALETTE D'INSTRUMENTS
     instruments = {
         "eau": s.new_part("Marimba"),
         "air": s.new_part("Electric Piano"),
         "feu": s.new_part("Acoustic Guitar"),
-        "terre": s.new_part("Cello"),       # Cordes frottées graves
-        "espace": s.new_part("Pad 7 (halo)") # Nappe synthétique
+        "terre": s.new_part("Cello"),
+        "espace": s.new_part("Pad 7 (halo)")
     }
     
     note_courante = 60 
@@ -54,28 +74,29 @@ def main():
                 wait(0.1)
                 continue
 
-            # --- GESTION INTELLIGENTE ---
+            # --- INTELLIGENCE ---
             if config.ETAT["mode_auto"]:
                 gerer_mode_auto()
 
-            # Lecture param
+            # Lecture Données
             preset = config.ETAT["preset"]
             inst = instruments[preset]
             
-            # Sélection Gamme
+            # Choix Gamme
             if preset == "eau": gamme = gammes.EAU
             elif preset == "air": gamme = gammes.AIR
             elif preset == "feu": gamme = gammes.FEU
             elif preset == "terre": gamme = gammes.TERRE
             else: gamme = gammes.ESPACE
 
-            # Paramètres dynamiques
+            # Paramètres
             vitesse = config.ETAT["vitesse"]
             intensite = config.ETAT["intensite"]
+            chaos = config.ETAT["chaos"]
+            gravite = config.ETAT["gravite"]
             
-            # Le Pad (Espace) et le Cello (Terre) sont lents par nature
+            # Logique de jeu (inchangée mais contrôlée par l'auto)
             facteur_lent = 2.0 if preset in ["espace", "terre"] else 1.0
-            
             attente = (0.8 - (vitesse / 150.0)) * facteur_lent
             if attente < 0.05: attente = 0.05
 
@@ -83,20 +104,17 @@ def main():
             
             if random.random() < seuil:
                 direction = random.choice([-1, 1])
-                if random.random() * 100 < config.ETAT["chaos"]: direction *= -1
+                if random.random() * 100 < chaos: direction *= -1
                 
-                note_brute = trouver_note_proche(note_courante, gamme, direction, config.ETAT["chaos"])
+                note_brute = trouver_note_proche(note_courante, gamme, direction, chaos)
                 note_courante = note_brute
                 
-                # Gravité
-                note_jouee = note_brute + (config.ETAT["gravite"] * 12)
+                note_jouee = note_brute + (gravite * 12)
                 
                 vol = 0.3 + (intensite / 200.0)
                 vol = random.uniform(vol - 0.1, vol + 0.1)
                 
-                # Effet de "Sustain" (Résonance) selon l'instrument
                 overlap = 6.0 if preset == "espace" else (3.0 if preset == "terre" else 1.2)
-                
                 inst.play_note(note_jouee, vol, attente * overlap, blocking=False)
             
             wait(attente)

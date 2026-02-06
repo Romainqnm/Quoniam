@@ -5,25 +5,45 @@ import config
 
 def main(page: ft.Page):
     # CONFIGURATION
-    page.title = "QUONIAM v2.1 Emoji Pure"
+    page.title = "QUONIAM v2.3 Premium"
     page.theme_mode = ft.ThemeMode.DARK
-    page.window_width = 460
-    page.window_height = 900
+    page.window_width = 450
+    # On réduit la hauteur par défaut pour que ça rentre partout
+    page.window_height = 800 
     page.padding = 0 
     
-    # Fond Dégradé
     gradient_bg = ft.LinearGradient(
         begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1),
         colors=["#0f0c29", "#302b63", "#24243e"]
     )
 
-    # --- UI ELEMENTS ---
+    # --- HEADER ---
     header = ft.Column([
-        ft.Text("QUONIAM", size=35, font_family="Roboto Mono", weight="w200", color="white"),
-        ft.Text("Living Environment v2.1", size=12, color="#99ffffff"),
-    ], horizontal_alignment="center")
+        ft.Text(
+            "Q U O N I A M", 
+            size=30, 
+            weight=ft.FontWeight.BOLD,
+            color="white",
+            text_align=ft.TextAlign.CENTER,
+        ),
+        ft.Container(
+            content=ft.Text(
+                "L I V I N G   A T M O S P H E R E", 
+                size=10, 
+                weight=ft.FontWeight.W_300,
+                color="#88ffffff"
+            ),
+            margin=ft.margin.only(top=5)
+        ),
+        ft.Container(
+            width=40, height=2, bgcolor="#44ffffff",
+            margin=ft.margin.only(top=15, bottom=5), # Marges réduites
+            border_radius=10
+        )
+    ], horizontal_alignment="center", spacing=0)
 
-    txt_icone = ft.Text("💧", size=60)
+    # --- UI ELEMENTS ---
+    txt_icone = ft.Text("💧", size=50) # Un peu plus petit (60 -> 50)
     lbl_vitesse = ft.Text("50%", size=12, weight="bold")
     lbl_intensite = ft.Text("30%", size=12, weight="bold")
     lbl_gravite = ft.Text("Octave 0", size=12, weight="bold")
@@ -85,7 +105,7 @@ def main(page: ft.Page):
         return ft.Container(
             content=ft.Column([ft.Text(icon, size=24), ft.Text(nom, size=10, color="white")], alignment="center"),
             data=code, on_click=changer_preset,
-            width=70, height=70, border_radius=15, 
+            width=65, height=65, border_radius=15, # Un peu plus compact (70 -> 65)
             bgcolor="#1affffff", ink=True, border=ft.border.all(1, "#1affffff")
         )
 
@@ -120,7 +140,6 @@ def main(page: ft.Page):
     controls_panel = ft.Container(
         content=ft.Column([
             ft.Row([
-                # LE COUPABLE EST REMPLACÉ ICI : "⏰" au lieu de ft.Icon("access_time")
                 ft.Text("⏰", size=16), 
                 ft.Text("Adaptation Circadienne (Auto)", size=12, weight="bold"),
                 ft.Container(expand=True),
@@ -131,14 +150,16 @@ def main(page: ft.Page):
             slider_row("Intensité", "intensite", 0, 100, 100, "🌊", lbl_intensite),
             slider_row("Gravité", "gravite", -2, 2, 4, "⚓", lbl_gravite),
             slider_row("Chaos", "chaos", 0, 100, 100, "🎲", lbl_chaos),
-        ], spacing=15),
-        padding=20
+        ], spacing=10), # Espacement réduit dans le panneau (15 -> 10)
+        padding=15 # Padding réduit (20 -> 15)
     )
 
     main_layout = ft.Container(
-        gradient=gradient_bg, expand=True, padding=30,
+        gradient=gradient_bg, expand=True, padding=20, # Padding global réduit (30 -> 20)
         content=ft.Column([
-            ft.Container(height=30),
+            # LE FIX SCROLL : On active le scroll caché
+            # Si l'écran est petit, tu pourras descendre avec la souris
+            ft.Container(height=20), 
             header,
             ft.Container(height=20),
             txt_icone,
@@ -150,15 +171,15 @@ def main(page: ft.Page):
             controls_panel,
             ft.Container(expand=True),
             btn_play_container,
-            ft.Container(height=30),
-        ], horizontal_alignment="center")
+            ft.Container(height=20),
+        ], horizontal_alignment="center", scroll=ft.ScrollMode.HIDDEN) 
     )
 
     page.add(main_layout)
     update_ui()
 
 if __name__ == "__main__":
-    print("Lancement v2.1 (Zéro Icones)...")
+    print("Lancement v2.3 Premium Compact...")
     thread_son = threading.Thread(target=moteur_audio.main, daemon=True)
     thread_son.start()
     ft.app(target=main)
