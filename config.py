@@ -11,5 +11,9 @@ ETAT = {
     "vitesse": 50,
     "intensite": 30,
     "gravite": 0,
-    "chaos": 20
+    "chaos": 20,
+    
+    # ORCHESTRA MODE
+    "mode_orchestre": False,
+    "instruments_actifs": [] # Liste des instruments actifs (ex: ["piano", "violon"])
 }

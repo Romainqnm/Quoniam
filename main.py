@@ -61,13 +61,24 @@ def main():
             "ete": s.new_part("Steel Drums"),
             "automne": s.new_part("Shakuhachi"),
             "vide": s.new_part("Pad 3 (polysynth)"),
-
+            
             # Atmos
             "zen": s.new_part("Sitar"),
-            "cyber": s.new_part("Lead 2 (sawtooth)"), # Modifié pour meilleure compatibilité
+            "cyber": s.new_part("Lead 2 (sawtooth)"),
             "lofi": s.new_part("Electric Piano 2"),
             "jungle": s.new_part("Pan Flute"),
-            "indus": s.new_part("Tubular Bells")
+            "indus": s.new_part("Tubular Bells"),
+            
+            # Orchestra Mode (Real Instruments)
+            "piano": s.new_part("Acoustic Grand Piano"),
+            "violon": s.new_part("Violin"),
+            "violoncelle": s.new_part("Cello"),
+            "contrebasse": s.new_part("Contrabass"),
+            "flute": s.new_part("Flute"),
+            "clarinette": s.new_part("Clarinet"),
+            "guitare": s.new_part("Acoustic Guitar (steel)"),
+            "basse": s.new_part("Acoustic Bass"),
+            "harpe": s.new_part("Orchestral Harp")
         }
     except Exception as e:
         print(f"❌ Erreur chargement instrument : {e}")
@@ -109,6 +120,59 @@ def main():
 
                 if config.ETAT["mode_auto"]: pass 
 
+                # ORCHESTRA MODE LOGIC
+                if config.ETAT.get("mode_orchestre", False):
+                    actifs = config.ETAT.get("instruments_actifs", [])
+                    if not actifs:
+                        wait(0.5)
+                        continue
+                        
+                    # Play loop for Orchestra
+                    gamme = [60, 62, 64, 65, 67, 69, 71, 72] # C Major default
+                    
+                    vitesse = config.ETAT["vitesse"]
+                    intensite = config.ETAT["intensite"]
+                    chaos = config.ETAT["chaos"]
+                    
+                    attente = (1.0 - (vitesse / 120.0))
+                    attente = max(0.2, humaniser(attente, 0.2))
+                    
+                    # Determine next note based on random walk
+                    direction = random.choice([-1, 1])
+                    if random.random() * 100 < chaos: direction *= -1
+                    saut = 1
+                    if random.random() * 100 < chaos: saut = random.randint(2, 4)
+                    
+                    try:
+                        curr = min(gamme, key=lambda x: abs(x-note_courante))
+                        curr_idx = gamme.index(curr)
+                        new_idx = max(0, min(curr_idx + (direction*saut), len(gamme)-1))
+                        note_brute = gamme[new_idx]
+                    except: note_brute = 60
+                    
+                    note_courante = note_brute
+                    
+                    # Play all selected instruments (Polyrhythm chance)
+                    for inst_name in actifs:
+                        if inst_name in instruments:
+                            inst = instruments[inst_name]
+                            
+                            # Probabilistic play to avoid clutter
+                            if random.random() < 0.7: 
+                                vol = 0.2 + (intensite / 200.0)
+                                sustain = 1.5
+                                
+                                # Pitch variation per instrument class for harmony
+                                pitch = note_courante
+                                if inst_name in ["contrebasse", "basse", "violoncelle"]: pitch -= 12
+                                if inst_name in ["flute", "violon", "piccolo"]: pitch += 12
+                                
+                                inst.play_note(pitch, vol, attente*sustain, blocking=False)
+                    
+                    wait(attente)
+                    continue
+
+                # STANDARD MODE LOGIC
                 preset = config.ETAT["preset"]
                 if preset is None: 
                     wait(0.1)

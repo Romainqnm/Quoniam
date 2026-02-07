@@ -4,11 +4,14 @@ import time
 import main as moteur_audio
 import config
 import random
+import base64
+import assets_library as assets
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v4.9.1 Final Polish"
-    page.theme_mode = ft.ThemeMode.DARK
+    page.title = "QUONIAM v5.0"
+    page.theme_mode = "dark"
+    page.bgcolor = "#1a1a1a"
     page.window_width = 450
     page.window_height = 800
     page.padding = 0 
@@ -38,7 +41,9 @@ def main(page: ft.Page):
         "cyber": ("orb", "#00e676", "#2979ff"),
         "lofi": ("orb", "#d7ccc8", "#795548"),
         "jungle": ("leaf", "#1b5e20", "#4caf50"),
-        "indus": ("orb", "#607d8b", "#ff5722")
+        "indus": ("orb", "#607d8b", "#ff5722"),
+        # Instruments
+        "instruments": ("note", "#ff9800", "#ffca28")
     }
 
     # --- HELPERS UI (GLOBAL) ---
@@ -64,6 +69,33 @@ def main(page: ft.Page):
                 ),
                 border_radius=ft.border_radius.only(top_left=size, bottom_right=size, top_right=0, bottom_left=0),
                 shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+            )
+        elif kind == "note": # Music Mode - restored Geometric Vinyl
+            offset_y = 0
+            if scale > 1.2: offset_y = 10 # Adjust for main bubble
+            
+            # Geometric Primitive: Vinyl Record / Gold Disc
+            # Using only Containers with Border Radius and HEX COLORS
+            return ft.Container(
+                width=size, height=size,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment(-1,-1), end=ft.Alignment(1,1),
+                    colors=[color_start, color_end]
+                ),
+                border_radius=size,
+                alignment=ft.Alignment(0,0),
+                content=ft.Container(
+                    width=size*0.6, height=size*0.6,
+                    border_radius=size,
+                    border=ft.Border.all(2*scale, ft.Colors.with_opacity(0.8, "#FFFFFF")), # Safe Hex White
+                    content=ft.Container(
+                        width=size*0.2, height=size*0.2,
+                        bgcolor="#FFFFFF", # Safe Hex White
+                        border_radius=size,
+                    )
+                ),
+                border=ft.Border.all(2*scale, ft.Colors.with_opacity(0.5, "#FFFFFF")),
+                shadow=ft.BoxShadow(blur_radius=15*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
             )
         elif kind == "orb": # Abstract
             return ft.Container(
@@ -380,6 +412,13 @@ def main(page: ft.Page):
 
     # --- NAVIGATION ---
 
+    def update_central_icon_for_preset(preset_code):
+        if preset_code not in PRESET_THEMES: return
+        kind, c1, c2 = PRESET_THEMES[preset_code]
+        container_icone.content = LiquidIcon(kind, c1, c2, scale=1.0)
+        # Also update particles color if needed (optional, handled by update_ui loop mostly)
+        container_icone.update()
+
     def charger_interface_controle(nom_collection):
         config.ETAT["collection"] = nom_collection
         
@@ -388,18 +427,31 @@ def main(page: ft.Page):
             presets_controls = creer_boutons_elements()
             bg_gradient.gradient.colors = COLORS_ELEMENTS
             container_icone.shadow.color = ft.Colors.with_opacity(0.5, "red") 
+            container_icone.content = LiquidIcon("droplet", "#b71c1c", "#f44336", scale=1.0) # Reset to Fire/Droplet
             
         elif nom_collection == "saisons":
             config.ETAT["preset"] = "terre" # Changed to Earth as default for Green theme
             presets_controls = creer_boutons_saisons()
             bg_gradient.gradient.colors = COLORS_SAISONS
             container_icone.shadow.color = ft.Colors.with_opacity(0.5, "green") 
+            container_icone.content = LiquidIcon("leaf", "#1b5e20", "#4caf50", scale=1.0) # Reset to Leaf
+            
+        elif nom_collection == "instruments":
+            config.ETAT["mode_orchestre"] = True
+            config.ETAT["preset"] = None # No single preset
+            if "instruments_actifs" not in config.ETAT: config.ETAT["instruments_actifs"] = []
+            
+            presets_controls = creer_boutons_instruments()
+            bg_gradient.gradient.colors = ["#3e2723", "#5d4037", "#795548"] # Bronze/Gold theme
+            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "orange") 
+            container_icone.content = LiquidIcon("note", "#ff9800", "#ffca28", scale=1.0) # New Note Icon
             
         else:
             config.ETAT["preset"] = "zen"
             presets_controls = creer_boutons_atmos()
             bg_gradient.gradient.colors = COLORS_ATMOS
             container_icone.shadow.color = ft.Colors.with_opacity(0.5, "purple") 
+            container_icone.content = LiquidIcon("orb", "#4a148c", "#9c27b0", scale=1.0) # Reset to Orb 
             
         container_presets.content = presets_controls
         
@@ -412,6 +464,7 @@ def main(page: ft.Page):
     def retour_accueil(e):
         config.ETAT["collection"] = None
         config.ETAT["actif"] = False 
+        config.ETAT["mode_orchestre"] = False # Disable Orchestra mode 
         
         bg_gradient.gradient.colors = COLORS_ACCUEIL
         main_layout_stack.controls[2].content = creer_contenu_accueil()
@@ -457,17 +510,21 @@ def main(page: ft.Page):
                 on_click=lambda _: charger_interface_controle(code)
             )
         
+        # Liste explicite pour éviter tout élément fantôme
+        liste_cartes = [
+            carte("droplet", "ELEMENTS", "Nature & Raw Power", "elements", "cyan", "blue", "cyan"),
+            carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
+            carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink"),
+            carte("note", "ORCHESTRA", "Create Harmony", "instruments", "#FF9800", "#FFD700", "#8D6E63")
+        ]
+
         return ft.Column([
             ft.Container(height=40),
             creer_header(),
             ft.Container(height=40),
             ft.Text("CHOOSE YOUR WORLD", size=14, weight="bold", color=ft.Colors.with_opacity(0.5, "white")),
             ft.Container(height=20),
-            ft.Row([
-                carte("droplet", "ELEMENTS", "Nature & Raw Power", "elements", "cyan", "blue", "cyan"),
-                carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
-                carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink")
-            ], alignment="center", wrap=True, spacing=10),
+            ft.Row(controls=liste_cartes, alignment="center", wrap=True, spacing=10),
             ft.Container(expand=True),
             ft.Text("v5.0 Liquid Glass Edition", size=10, color="#44ffffff")
         ], horizontal_alignment="center")
@@ -494,7 +551,8 @@ def main(page: ft.Page):
         top_bar = ft.Row([
             top_btn("ELEMENTS", "elements"),
             top_btn("SEASONS", "saisons"),
-            top_btn("ATMOS", "atmos")
+            top_btn("ATMOS", "atmos"),
+            top_btn("ORCHESTRA", "instruments")
         ], alignment="center", spacing=5)
 
         header_nav = ft.Container(
@@ -552,7 +610,7 @@ def main(page: ft.Page):
                 ft.Text(nom, size=10, color=ft.Colors.with_opacity(0.9, "white"), weight="bold")
             ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             data=code, 
-            on_click=changer_preset,
+            on_click=lambda e: [changer_preset(e), update_central_icon_for_preset(code)],
             width=70, height=70,
             border_radius=15,
             gradient=ft.LinearGradient(
@@ -605,7 +663,7 @@ def main(page: ft.Page):
     def creer_boutons_atmos():
         return ft.Column([
             ft.Row([
-                btn_preset("leaf", "Zen", "zen", "#81c784", "#c8e6c9"), 
+                btn_preset("orb", "Zen", "zen", "#81c784", "#c8e6c9"), 
                 btn_preset("orb", "Cyber", "cyber", "#00e676", "#2979ff"), 
                 btn_preset("orb", "LoFi", "lofi", "#d7ccc8", "#795548")
             ], alignment="center"),
@@ -615,6 +673,65 @@ def main(page: ft.Page):
                 btn_preset("orb", "Indus", "indus", "#607d8b", "#ff5722")
             ], alignment="center")
         ])
+
+    def creer_boutons_instruments():
+        def toggle_inst(e):
+            inst = e.control.data
+            actifs = config.ETAT.get("instruments_actifs", [])
+            
+            if inst in actifs:
+                actifs.remove(inst)
+                e.control.bgcolor = ft.Colors.with_opacity(0.1, "white")
+                e.control.border = ft.Border.all(1, ft.Colors.with_opacity(0.15, "white"))
+                e.control.shadow.color = ft.Colors.TRANSPARENT
+            else:
+                actifs.append(inst)
+                e.control.bgcolor = ft.Colors.with_opacity(0.3, "gold")
+                e.control.border = ft.Border.all(1, "gold")
+                e.control.shadow.color = "orange"
+                
+            config.ETAT["instruments_actifs"] = actifs
+            e.control.update()
+
+        def get_asset(code):
+            mapping = {
+                "piano": assets.SVG_PIANO,
+                "violon": assets.SVG_VIOLIN, "violoncelle": assets.SVG_CELLO, "contrebasse": assets.SVG_CONTRABASS,
+                "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS,
+                "flute": assets.SVG_FLUTE, "clarinette": assets.SVG_CLARINET,
+                "harpe": assets.SVG_HARP
+            }
+            return mapping.get(code, assets.SVG_NOTE)
+
+        def btn_inst(nom, code):
+            est_actif = code in config.ETAT.get("instruments_actifs", [])
+            svg_content = get_asset(code)
+            b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+            
+            return ft.Container(
+                content=ft.Column([
+                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=30, height=30, color="gold" if est_actif else "white", animate_scale=200),
+                    ft.Text(nom, size=10, color="white", weight="bold")
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                data=code,
+                on_click=toggle_inst,
+                width=75, height=75,
+                border_radius=15,
+                bgcolor=ft.Colors.with_opacity(0.3 if est_actif else 0.1, "gold" if est_actif else "white"),
+                border=ft.Border.all(1, "gold" if est_actif else ft.Colors.with_opacity(0.15, "white")),
+                shadow=ft.BoxShadow(blur_radius=10, color="orange" if est_actif else ft.Colors.TRANSPARENT),
+                ink=True,
+                animate_scale=200
+            )
+
+        return ft.Column([
+            ft.Text("KEYS & STRINGS", size=10, color="#88ffffff", weight="bold"),
+            ft.Row([btn_inst("Piano", "piano"), btn_inst("Violin", "violon"), btn_inst("Cello", "violoncelle")], alignment="center"),
+            ft.Row([btn_inst("Harp", "harpe"), btn_inst("Guitar", "guitare"), btn_inst("Bass", "basse")], alignment="center"),
+            ft.Divider(color="#22ffffff"),
+            ft.Text("WINDS & MORE", size=10, color="#88ffffff", weight="bold"),
+            ft.Row([btn_inst("Flute", "flute"), btn_inst("Clarinet", "clarinette"), btn_inst("C.Bass", "contrebasse")], alignment="center"),
+        ], horizontal_alignment="center", spacing=5)
 
     def creer_panneau_sliders():
         switch_auto.on_change = toggle_auto
