@@ -91,66 +91,73 @@ def main(page: ft.Page):
     def animer_coeur():
         angle = 0
         while True:
-            if config.ETAT["actif"] and container_icone.page:
-                
-                vitesse = config.ETAT["vitesse"]
-                intensite = config.ETAT["intensite"]
-                preset = config.ETAT["preset"]
-                
-                tempo_base = 2.0 - (vitesse / 55.0)
-                tempo = max(0.35, tempo_base)
-                
-                scale_max = 1.0 + (intensite / 250.0) 
-                
-                nervous_presets = ["feu", "cyber", "indus", "ete"]
-                if preset in nervous_presets:
-                    container_icone.animate_scale = ft.Animation(int(tempo*500), ft.AnimationCurve.ELASTIC_OUT)
+            try:
+                # Check if attached to page (safe check)
+                if not container_icone.page:
+                    time.sleep(0.5)
+                    continue
+                    
+                if config.ETAT["actif"]:    
+                    vitesse = config.ETAT["vitesse"]
+                    intensite = config.ETAT["intensite"]
+                    preset = config.ETAT["preset"]
+                    
+                    tempo_base = 2.0 - (vitesse / 55.0)
+                    tempo = max(0.35, tempo_base)
+                    
+                    scale_max = 1.0 + (intensite / 250.0) 
+                    
+                    nervous_presets = ["feu", "cyber", "indus", "ete"]
+                    if preset in nervous_presets:
+                        container_icone.animate_scale = ft.Animation(int(tempo*500), ft.AnimationCurve.ELASTIC_OUT)
+                    else:
+                        container_icone.animate_scale = ft.Animation(int(tempo*900), ft.AnimationCurve.EASE_IN_OUT)
+
+                    # ANIMATION LOGIC
+                    # Pulse
+                    if preset in ["eau", "terre", "printemps", "zen"]:
+                         container_icone.scale = scale_max
+                         container_icone.rotate.angle = 0
+                    
+                    # Spin
+                    elif preset in ["espace", "vide", "cyber", "indus"]:
+                        angle += 0.5 
+                        container_icone.rotate.angle = angle
+                        container_icone.scale = 1.0 # No pulse for spin
+
+                    # Shake/Vibrate (Simulated by random small rotations/sales)
+                    elif preset in ["feu", "ete"]:
+                        container_icone.rotate.angle = random.uniform(-0.1, 0.1)
+                        container_icone.scale = scale_max * random.uniform(0.95, 1.05)
+                    
+                    else: # Default hybrid
+                        container_icone.scale = scale_max
+                        container_icone.rotate.angle = 0
+
+                    # Aura
+                    container_icone.shadow.spread_radius = 5 + (intensite/10)
+                    container_icone.shadow.color = ft.Colors.with_opacity(0.8, "white")
+                    
+                    container_icone.update()
+                    time.sleep(tempo)
+                    
+                    # REST STATE
+                    container_icone.scale = 1.0
+                    if preset in ["espace", "vide", "cyber", "indus"]:
+                         angle += 0.5
+                         container_icone.rotate.angle = angle
+                    else:
+                         container_icone.rotate.angle = 0
+                    
+                    container_icone.shadow.spread_radius = 0
+                    container_icone.shadow.color = ft.Colors.with_opacity(0.3, "white")
+                    
+                    container_icone.update()
+                    time.sleep(tempo)
                 else:
-                    container_icone.animate_scale = ft.Animation(int(tempo*900), ft.AnimationCurve.EASE_IN_OUT)
-
-                # ANIMATION LOGIC
-                # Pulse
-                if preset in ["eau", "terre", "printemps", "zen"]:
-                     container_icone.scale = scale_max
-                     container_icone.rotate.angle = 0
-                
-                # Spin
-                elif preset in ["espace", "vide", "cyber", "indus"]:
-                    angle += 0.5 
-                    container_icone.rotate.angle = angle
-                    container_icone.scale = 1.0 # No pulse for spin
-
-                # Shake/Vibrate (Simulated by random small rotations/sales)
-                elif preset in ["feu", "ete"]:
-                    container_icone.rotate.angle = random.uniform(-0.1, 0.1)
-                    container_icone.scale = scale_max * random.uniform(0.95, 1.05)
-                
-                else: # Default hybrid
-                    container_icone.scale = scale_max
-                    container_icone.rotate.angle = 0
-
-                # Aura
-                container_icone.shadow.spread_radius = 5 + (intensite/10)
-                container_icone.shadow.color = ft.Colors.with_opacity(0.8, "white")
-                
-                container_icone.update()
-                time.sleep(tempo)
-                
-                # REST STATE
-                container_icone.scale = 1.0
-                if preset in ["espace", "vide", "cyber", "indus"]:
-                     angle += 0.5
-                     container_icone.rotate.angle = angle
-                else:
-                     container_icone.rotate.angle = 0
-                
-                container_icone.shadow.spread_radius = 0
-                container_icone.shadow.color = ft.Colors.with_opacity(0.3, "white")
-                
-                container_icone.update()
-                time.sleep(tempo)
-                
-            else:
+                    time.sleep(1.0)
+            except Exception as e:
+                # Silently ignore page attachment errors during startup/shutdown
                 time.sleep(1.0)
 
 
@@ -243,31 +250,89 @@ def main(page: ft.Page):
     # --- VUES ---
     
     def creer_contenu_accueil():
-        def carte(emoji, titre, sous_titre, code):
+        
+        # Helper pour créer des icônes géométriques pures (CODE ONLY - NO ASSETS)
+        def LiquidIcon(kind, color_start, color_end):
+            if kind == "droplet": # Elements
+                return ft.Container(
+                    width=50, height=50,
+                    gradient=ft.LinearGradient(
+                        begin=ft.Alignment(-1,1), end=ft.Alignment(1,-1),
+                        colors=[color_start, color_end]
+                    ),
+                    border_radius=ft.border_radius.only(top_left=0, top_right=50, bottom_left=50, bottom_right=50),
+                    rotate=ft.Rotate(0.785), # 45deg
+                    shadow=ft.BoxShadow(blur_radius=10, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                )
+            elif kind == "leaf": # Seasons
+                return ft.Container(
+                    width=50, height=50,
+                    gradient=ft.LinearGradient(
+                        begin=ft.Alignment(0,1), end=ft.Alignment(0,-1),
+                        colors=[color_start, color_end]
+                    ),
+                    border_radius=ft.border_radius.only(top_left=50, bottom_right=50, top_right=0, bottom_left=0),
+                    shadow=ft.BoxShadow(blur_radius=10, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                )
+            elif kind == "orb": # Atmos
+                return ft.Container(
+                    width=50, height=50,
+                    gradient=ft.RadialGradient(
+                        colors=[color_end, color_start],
+                    ),
+                    border_radius=50,
+                    border=ft.Border.all(2, ft.Colors.with_opacity(0.5, "white")),
+                    shadow=ft.BoxShadow(blur_radius=15, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                )
+            return ft.Container()
+
+        def carte(icon_kind, titre, sous_titre, code, color_theme, c1, c2):
             return ft.Container(
                 content=ft.Column([
-                    ft.Text(emoji, size=35),
-                    ft.Text(titre, weight="bold", size=12),
-                    ft.Text(sous_titre, size=9, color="#88ffffff")
-                ], alignment="center"),
-                width=100, height=140, bgcolor="#1affffff", border_radius=20,
-                ink=True, on_click=lambda _: charger_interface_controle(code),
-                border=ft.Border.all(1, "#33ffffff")
+                    ft.Container(
+                        content=LiquidIcon(icon_kind, c1, c2),
+                        padding=10,
+                        alignment=ft.Alignment(0, 0),
+                    ),
+                    ft.Text(titre, weight="bold", size=16, color="white", text_align="center"),
+                    ft.Text(sous_titre, size=11, color=ft.Colors.with_opacity(0.7, "white"), text_align="center")
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
+                width=140, height=220,
+                border_radius=30,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                    colors=[
+                        ft.Colors.with_opacity(0.15, "white"),
+                        ft.Colors.with_opacity(0.05, "white"),
+                    ],
+                ),
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                shadow=ft.BoxShadow(
+                    blur_radius=30,
+                    spread_radius=-10,
+                    color=color_theme,
+                    offset=ft.Offset(0, 15)
+                ),
+                padding=20,
+                margin=10,
+                ink=True,
+                on_click=lambda _: charger_interface_controle(code)
             )
         
         return ft.Column([
             ft.Container(height=40),
             creer_header(),
-            ft.Container(height=60),
-            ft.Text("CHOOSE YOUR WORLD", size=12, color="#88ffffff"),
+            ft.Container(height=40),
+            ft.Text("CHOOSE YOUR WORLD", size=14, weight="bold", color=ft.Colors.with_opacity(0.5, "white")),
             ft.Container(height=20),
             ft.Row([
-                carte("🌱", "ELEMENTS", "Nature", "elements"),
-                carte("❄️", "SEASONS", "Journey", "saisons"),
-                carte("🎋", "ATMOS", "Exotic", "atmos")
-            ], alignment="center", spacing=15),
+                carte("droplet", "ELEMENTS", "Nature & Raw Power", "elements", "cyan", "blue", "cyan"),
+                carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
+                carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink")
+            ], alignment="center", wrap=True, spacing=10),
             ft.Container(expand=True),
-            ft.Text("v4.9.1 Final Polish", size=10, color="#44ffffff")
+            ft.Text("v5.0 Liquid Glass Edition", size=10, color="#44ffffff")
         ], horizontal_alignment="center")
 
     def creer_contenu_controle():
@@ -332,10 +397,31 @@ def main(page: ft.Page):
     
     def btn_preset(icon, nom, code):
         return ft.Container(
-            content=ft.Column([ft.Text(icon, size=20), ft.Text(nom, size=9, color="white")], alignment="center"),
-            data=code, on_click=changer_preset,
-            width=60, height=60, border_radius=15, bgcolor="#1affffff", ink=True, 
-            border=ft.Border.all(1, "#1affffff")
+            content=ft.Column([
+                ft.Text(icon, size=24),
+                ft.Text(nom, size=10, color=ft.Colors.with_opacity(0.9, "white"), weight="bold")
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
+            data=code, 
+            on_click=changer_preset,
+            width=70, height=70,
+            border_radius=15,
+            gradient=ft.LinearGradient(
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
+                colors=[
+                    ft.Colors.with_opacity(0.1, "white"),
+                    ft.Colors.with_opacity(0.02, "white"),
+                ],
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.15, "white")),
+            shadow=ft.BoxShadow(
+                blur_radius=10,
+                spread_radius=-5,
+                color=ft.Colors.with_opacity(0.5, "black"),
+                offset=ft.Offset(0, 5)
+            ),
+            padding=5,
+            ink=True
         )
 
     def creer_boutons_elements():
