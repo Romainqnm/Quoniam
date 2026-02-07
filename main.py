@@ -127,7 +127,7 @@ def main():
                 facteur_lent = 2.0 if preset in presets_lents else 1.0
                 
                 attente = (1.0 - (vitesse / 120.0)) * facteur_lent
-                attente = max(0.15, humaniser(attente, 0.2)) # Increased min wait from 0.1 to 0.15
+                attente = max(0.2, humaniser(attente, 0.2)) # Increased min wait from 0.15 to 0.2
 
                 seuil_jeu = 0.35 + (intensite / 200.0)
                 
@@ -149,12 +149,12 @@ def main():
                     
                     vol = 0.25 + (intensite / 180.0)
                     vol = humaniser(vol, 0.1)
-                    sustain = 2.5
+                    sustain = 1.5 # Reduced from 2.5 to 1.5 to free up voices
                     
                     if intensite > 65 and random.random() < 0.35:
                         acc = trouver_accords(note_finale, gamme)
                         for n in acc:
-                            wait(0.06) # Increased from 0.03 to 0.06 to ease ringbuffer load
+                            wait(0.1) # Increased from 0.06 to 0.1
                             inst.play_note(n, vol*0.85, attente*sustain, blocking=False)
                     else:
                         inst.play_note(note_finale, vol, attente*sustain, blocking=False)

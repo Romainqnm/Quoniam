@@ -14,9 +14,10 @@ def main(page: ft.Page):
     page.padding = 0 
     
     # PALETTES DE COULEURS
-    COLORS_ELEMENTS = ["#0f0c29", "#302b63", "#24243e"]
-    COLORS_SAISONS  = ["#134E5E", "#71B280"] 
-    COLORS_ATMOS    = ["#480048", "#C04848"] 
+    COLORS_ACCUEIL  = ["#0f0c29", "#302b63", "#24243e"]
+    COLORS_ELEMENTS = ["#b71c1c", "#d32f2f", "#f44336"] # Fire Red
+    COLORS_SAISONS  = ["#1b5e20", "#388e3c", "#4caf50"] # Earth Green
+    COLORS_ATMOS    = ["#4a148c", "#7b1fa2", "#9c27b0"] # Gemstone Purple 
 
     # MAP THEMES (Preset -> Kind, C1, C2)
     PRESET_THEMES = {
@@ -104,6 +105,105 @@ def main(page: ft.Page):
         animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
 
+    # --- PARTICLE SYSTEM (v6) ---
+    class Particle:
+        def __init__(self, page_width, page_height):
+            self.page_width = page_width
+            self.page_height = page_height
+            self.size = random.randint(5, 15)
+            self.x = random.uniform(0, page_width)
+            self.y = random.uniform(0, page_height)
+            self.vx = random.uniform(-0.5, 0.5)
+            self.vy = random.uniform(-0.5, 0.5)
+            self.opacity = random.uniform(0.1, 0.4)
+            self.color = "white"
+            
+            self.container = ft.Container(
+                width=self.size, height=self.size,
+                bgcolor=self.color,
+                border_radius=50,
+                left=self.x, top=self.y,
+                opacity=self.opacity,
+                animate_position=ft.Animation(2000, ft.AnimationCurve.LINEAR),
+                animate_opacity=ft.Animation(1000, ft.AnimationCurve.EASE_IN_OUT)
+            )
+
+        def update(self, theme_mode):
+            # Update Position
+            self.x += self.vx * 10
+            self.y += self.vy * 10
+            
+            # Wrap around screen
+            if self.x > self.page_width: self.x = 0
+            if self.x < 0: self.x = self.page_width
+            if self.y > self.page_height: self.y = 0
+            if self.y < 0: self.y = self.page_height
+            
+            self.container.left = self.x
+            self.container.top = self.y
+            
+            # Theme Behavior
+            if theme_mode == "elements": # Rising Bubbles
+                self.vy = random.uniform(-2.0, -0.5)
+                self.vx = random.uniform(-0.5, 0.5)
+                
+                # Sync color with preset
+                p = config.ETAT["preset"] # Fix UnboundLocalError
+                if p in PRESET_THEMES:
+                    kind, c1, c2 = PRESET_THEMES[p]
+                    if random.random() < 0.5: self.container.bgcolor = c1
+                    else: self.container.bgcolor = c2
+
+            elif theme_mode == "saisons": # Falling Petals
+                self.vy = random.uniform(0.5, 2.0)
+                self.vx = random.uniform(-1.0, 1.0)
+                self.container.width = random.randint(5, 15)
+                self.container.height = self.container.width
+                
+                # Sync color with preset
+                p = config.ETAT["preset"]
+                if p in PRESET_THEMES:
+                    kind, c1, c2 = PRESET_THEMES[p]
+                    self.container.bgcolor = c1 if random.random() < 0.5 else c2
+
+            elif theme_mode == "atmos": # Cyber/Static
+                # Sync color with preset
+                p = config.ETAT["preset"]
+                if p in PRESET_THEMES:
+                    kind, c1, c2 = PRESET_THEMES[p]
+                    self.container.bgcolor = c1 if random.random() < 0.5 else c2
+
+                if random.random() < 0.1: # Flicker move
+                    self.x = random.uniform(0, self.page_width)
+                    self.y = random.uniform(0, self.page_height)
+                
+            else: # Home / Default (Slow float)
+                self.container.bgcolor = "white"
+                self.vx = random.uniform(-0.5, 0.5)
+                self.vy = random.uniform(-0.5, 0.5)
+
+    particles = [Particle(450, 800) for _ in range(20)]
+    particle_layer = ft.Stack([p.container for p in particles])
+
+    def animer_fond():
+        while True:
+            current_theme = "home"
+            if config.ETAT["collection"] == "elements": current_theme = "elements"
+            elif config.ETAT["collection"] == "saisons": current_theme = "saisons"
+            elif config.ETAT["collection"] == "atmos": current_theme = "atmos"
+            
+            for p in particles:
+                p.update(current_theme)
+            
+            try:
+                page.update()
+            except: pass
+            time.sleep(0.1)
+
+    threading.Thread(target=animer_fond, daemon=True).start()
+
+    # --- UI COMPONENTS ---
+    
     lbl_vitesse = ft.Text("50%", size=12)
     lbl_intensite = ft.Text("30%", size=12)
     lbl_gravite = ft.Text("0", size=12)
@@ -119,13 +219,24 @@ def main(page: ft.Page):
 
     container_presets = ft.Container()
     
-    # LE FOND LIQUIDE
-    main_layout = ft.Container(
-        gradient=ft.LinearGradient(begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1), colors=COLORS_ELEMENTS), 
-        expand=True, 
-        padding=20,
-        animate=ft.Animation(2000, ft.AnimationCurve.EASE_OUT_CUBIC),
-        content=None
+    # WRAPPER PRINCIPAL (STACK)
+    # Layer 0: Gradient Background
+    bg_gradient = ft.Container(
+        gradient=ft.LinearGradient(begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1), colors=COLORS_ACCUEIL), 
+        expand=True,
+        animate=ft.Animation(2000, ft.AnimationCurve.EASE_OUT_CUBIC)
+    )
+    
+    # Layer 1: Particles (particle_layer)
+    # Layer 2: Main Content (Will be set in main_layout_stack.controls)
+    
+    main_layout_stack = ft.Stack(
+        [
+            bg_gradient,
+            particle_layer,
+            ft.Container(expand=True) # Placeholder for content
+        ],
+        expand=True
     )
 
     # HELPER NEON
@@ -273,27 +384,27 @@ def main(page: ft.Page):
         config.ETAT["collection"] = nom_collection
         
         if nom_collection == "elements":
-            config.ETAT["preset"] = "eau"
+            config.ETAT["preset"] = "feu" # Changed to Fire as default for Red theme
             presets_controls = creer_boutons_elements()
-            main_layout.gradient.colors = COLORS_ELEMENTS
-            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "cyan") 
+            bg_gradient.gradient.colors = COLORS_ELEMENTS
+            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "red") 
             
         elif nom_collection == "saisons":
-            config.ETAT["preset"] = "hiver"
+            config.ETAT["preset"] = "terre" # Changed to Earth as default for Green theme
             presets_controls = creer_boutons_saisons()
-            main_layout.gradient.colors = COLORS_SAISONS
+            bg_gradient.gradient.colors = COLORS_SAISONS
             container_icone.shadow.color = ft.Colors.with_opacity(0.5, "green") 
             
         else:
             config.ETAT["preset"] = "zen"
             presets_controls = creer_boutons_atmos()
-            main_layout.gradient.colors = COLORS_ATMOS
+            bg_gradient.gradient.colors = COLORS_ATMOS
             container_icone.shadow.color = ft.Colors.with_opacity(0.5, "purple") 
             
         container_presets.content = presets_controls
         
-        main_layout.content = creer_contenu_controle()
-        main_layout.update()
+        main_layout_stack.controls[2].content = creer_contenu_controle()
+        page.update()
         
         config.ETAT["actif"] = True 
         update_ui()
@@ -302,9 +413,9 @@ def main(page: ft.Page):
         config.ETAT["collection"] = None
         config.ETAT["actif"] = False 
         
-        main_layout.gradient.colors = COLORS_ELEMENTS
-        main_layout.content = creer_contenu_accueil()
-        main_layout.update()
+        bg_gradient.gradient.colors = COLORS_ACCUEIL
+        main_layout_stack.controls[2].content = creer_contenu_accueil()
+        page.update()
         page.update()
 
 
@@ -386,13 +497,22 @@ def main(page: ft.Page):
             top_btn("ATMOS", "atmos")
         ], alignment="center", spacing=5)
 
-        header_nav = ft.Row([
-            bouton_retour,
-            ft.Container(expand=True),
-            top_bar,
-            ft.Container(expand=True),
-            ft.Container(width=70) 
-        ])
+        header_nav = ft.Container(
+            content=ft.Row([
+                bouton_retour,
+                ft.Container(expand=True),
+                ft.Text("Q U O N I A M", size=18, weight="bold", color="white", font_family="Verdana"), # Stylized Title
+                ft.Container(expand=True),
+                top_bar,
+                ft.Container(width=10) 
+            ], alignment="center"),
+            bgcolor=ft.Colors.with_opacity(0.4, "black"), # Dark Glass Effect
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
+            border_radius=20,
+            padding=10,
+            blur=ft.Blur(10, 10),
+            margin=ft.Margin(left=10, top=0, right=10, bottom=0)
+        )
 
         return ft.Column([
             ft.Container(height=10),
@@ -404,8 +524,8 @@ def main(page: ft.Page):
             # CONTRASTED CONTAINER FOR PRESETS
             ft.Container(
                 content=container_presets,
-                bgcolor=ft.Colors.with_opacity(0.1, "white"),
-                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                bgcolor=ft.Colors.with_opacity(0.4, "black"), # Darker background for contrast
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
                 border_radius=20,
                 padding=20,
                 blur=ft.Blur(10, 10),
@@ -525,8 +645,8 @@ def main(page: ft.Page):
         )
 
     # Lancement
-    main_layout.content = creer_contenu_accueil()
-    page.add(main_layout)
+    main_layout_stack.controls[2].content = creer_contenu_accueil()
+    page.add(main_layout_stack)
     
     # Threading correction: Start animation loop AFTER adding content to page
     thread_anim = threading.Thread(target=animer_coeur, daemon=True)
