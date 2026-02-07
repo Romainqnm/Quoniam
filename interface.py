@@ -18,9 +18,69 @@ def main(page: ft.Page):
     COLORS_SAISONS  = ["#134E5E", "#71B280"] 
     COLORS_ATMOS    = ["#480048", "#C04848"] 
 
+    # MAP THEMES (Preset -> Kind, C1, C2)
+    PRESET_THEMES = {
+        # Elements
+        "terre": ("leaf", "#4caf50", "#2e7d32"),
+        "eau": ("droplet", "#00bcd4", "#0288d1"),
+        "feu": ("droplet", "#ff5722", "#ffeb3b"),
+        "air": ("orb", "#b0bec5", "#ffffff"),
+        "espace": ("orb", "#311b92", "#673ab7"),
+        # Saisons
+        "hiver": ("orb", "#81d4fa", "#ffffff"),
+        "printemps": ("leaf", "#f48fb1", "#c5e1a5"),
+        "ete": ("orb", "#ff9800", "#ffeb3b"),
+        "automne": ("leaf", "#a1887f", "#ff7043"),
+        "vide": ("orb", "#000000", "#4a148c"),
+        # Atmos
+        "zen": ("leaf", "#81c784", "#c8e6c9"),
+        "cyber": ("orb", "#00e676", "#2979ff"),
+        "lofi": ("orb", "#d7ccc8", "#795548"),
+        "jungle": ("leaf", "#1b5e20", "#4caf50"),
+        "indus": ("orb", "#607d8b", "#ff5722")
+    }
+
+    # --- HELPERS UI (GLOBAL) ---
+    def LiquidIcon(kind, color_start, color_end, scale=1.0):
+        size = 50 * scale
+        if kind == "droplet": # Liquid / Fire
+            return ft.Container(
+                width=size, height=size,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment(-1,1), end=ft.Alignment(1,-1),
+                    colors=[color_start, color_end]
+                ),
+                border_radius=ft.border_radius.only(top_left=0, top_right=size, bottom_left=size, bottom_right=size),
+                rotate=ft.Rotate(0.785), # 45deg
+                shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+            )
+        elif kind == "leaf": # Nature
+            return ft.Container(
+                width=size, height=size,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment(0,1), end=ft.Alignment(0,-1),
+                    colors=[color_start, color_end]
+                ),
+                border_radius=ft.border_radius.only(top_left=size, bottom_right=size, top_right=0, bottom_left=0),
+                shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+            )
+        elif kind == "orb": # Abstract
+            return ft.Container(
+                width=size, height=size,
+                gradient=ft.RadialGradient(
+                    colors=[color_end, color_start],
+                ),
+                border_radius=size,
+                border=ft.Border.all(2*scale, ft.Colors.with_opacity(0.5, "white")),
+                shadow=ft.BoxShadow(blur_radius=15*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+            )
+        return ft.Container()
+
     # --- VARIABLES ---
     # CONTENEUR ANIMÉ
-    icon_display = ft.Text("💧", size=50)
+    # Initial placeholder
+    icon_content = LiquidIcon("droplet", "#00bcd4", "#0288d1", scale=1.5)
+    icon_display = ft.Container(content=icon_content, alignment=ft.Alignment(0,0))
     
     # L'AURA (GLOW)
     glow_shadow = ft.BoxShadow(
@@ -170,14 +230,14 @@ def main(page: ft.Page):
         lbl_chaos.value = f"{int(config.ETAT['chaos'])}%"
         
         p = config.ETAT["preset"]
-        mapping_icones = {
-            "eau": "💧", "air": "☁️", "feu": "🔥", "terre": "🌱", "espace": "🌌",
-            "hiver": "❄️", "printemps": "🌸", "ete": "☀️", "automne": "🍂", "vide": "🌌",
-            "zen": "🎋", "cyber": "🤖", "lofi": "☕", "jungle": "🦜", "indus": "🏭"
-        }
-        if p in mapping_icones:
-            icon_display.value = mapping_icones[p]
         
+        # Update Main Icon based on Preset Theme
+        if p in PRESET_THEMES:
+            kind, c1, c2 = PRESET_THEMES[p]
+            # Recreate the icon with new parameters
+            new_icon = LiquidIcon(kind, c1, c2, scale=1.5)
+            icon_display.content = new_icon
+            
         if config.ETAT["actif"]:
             btn_play_content.text = "⏸  PAUSE"
             btn_play_container.gradient = ft.LinearGradient(colors=["#ff416c", "#ff4b2b"])
@@ -247,50 +307,16 @@ def main(page: ft.Page):
         main_layout.update()
         page.update()
 
+
+
     # --- VUES ---
     
     def creer_contenu_accueil():
-        
-        # Helper pour créer des icônes géométriques pures (CODE ONLY - NO ASSETS)
-        def LiquidIcon(kind, color_start, color_end):
-            if kind == "droplet": # Elements
-                return ft.Container(
-                    width=50, height=50,
-                    gradient=ft.LinearGradient(
-                        begin=ft.Alignment(-1,1), end=ft.Alignment(1,-1),
-                        colors=[color_start, color_end]
-                    ),
-                    border_radius=ft.border_radius.only(top_left=0, top_right=50, bottom_left=50, bottom_right=50),
-                    rotate=ft.Rotate(0.785), # 45deg
-                    shadow=ft.BoxShadow(blur_radius=10, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
-                )
-            elif kind == "leaf": # Seasons
-                return ft.Container(
-                    width=50, height=50,
-                    gradient=ft.LinearGradient(
-                        begin=ft.Alignment(0,1), end=ft.Alignment(0,-1),
-                        colors=[color_start, color_end]
-                    ),
-                    border_radius=ft.border_radius.only(top_left=50, bottom_right=50, top_right=0, bottom_left=0),
-                    shadow=ft.BoxShadow(blur_radius=10, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
-                )
-            elif kind == "orb": # Atmos
-                return ft.Container(
-                    width=50, height=50,
-                    gradient=ft.RadialGradient(
-                        colors=[color_end, color_start],
-                    ),
-                    border_radius=50,
-                    border=ft.Border.all(2, ft.Colors.with_opacity(0.5, "white")),
-                    shadow=ft.BoxShadow(blur_radius=15, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
-                )
-            return ft.Container()
-
         def carte(icon_kind, titre, sous_titre, code, color_theme, c1, c2):
             return ft.Container(
                 content=ft.Column([
                     ft.Container(
-                        content=LiquidIcon(icon_kind, c1, c2),
+                        content=LiquidIcon(icon_kind, c1, c2, scale=1.0),
                         padding=10,
                         alignment=ft.Alignment(0, 0),
                     ),
@@ -395,10 +421,14 @@ def main(page: ft.Page):
 
     # --- HELPERS BOUTONS ---
     
-    def btn_preset(icon, nom, code):
+    def btn_preset(kind, nom, code, c1, c2):
         return ft.Container(
             content=ft.Column([
-                ft.Text(icon, size=24),
+                ft.Container(
+                    content=LiquidIcon(kind, c1, c2, scale=0.4),
+                    alignment=ft.Alignment(0,0),
+                    height=25
+                ),
                 ft.Text(nom, size=10, color=ft.Colors.with_opacity(0.9, "white"), weight="bold")
             ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             data=code, 
@@ -406,8 +436,8 @@ def main(page: ft.Page):
             width=70, height=70,
             border_radius=15,
             gradient=ft.LinearGradient(
-                begin=ft.Alignment(-1, -1),
-                end=ft.Alignment(1, 1),
+                begin=ft.Alignment(-1.0, -1.0),
+                end=ft.Alignment(1.0, 1.0),
                 colors=[
                     ft.Colors.with_opacity(0.1, "white"),
                     ft.Colors.with_opacity(0.02, "white"),
@@ -417,7 +447,7 @@ def main(page: ft.Page):
             shadow=ft.BoxShadow(
                 blur_radius=10,
                 spread_radius=-5,
-                color=ft.Colors.with_opacity(0.5, "black"),
+                color=c1,
                 offset=ft.Offset(0, 5)
             ),
             padding=5,
@@ -426,23 +456,44 @@ def main(page: ft.Page):
 
     def creer_boutons_elements():
         return ft.Column([
-            ft.Row([btn_preset("🌱", "Earth", "terre"), btn_preset("💧", "Water", "eau"), btn_preset("🔥", "Fire", "feu")], alignment="center"),
+            ft.Row([
+                btn_preset("leaf", "Earth", "terre", "#4caf50", "#2e7d32"), 
+                btn_preset("droplet", "Water", "eau", "#00bcd4", "#0288d1"), 
+                btn_preset("droplet", "Fire", "feu", "#ff5722", "#ffeb3b")
+            ], alignment="center"),
             ft.Container(height=5),
-            ft.Row([btn_preset("☁️", "Air", "air"), btn_preset("🌌", "Space", "espace")], alignment="center")
+            ft.Row([
+                btn_preset("orb", "Air", "air", "#b0bec5", "#ffffff"), 
+                btn_preset("orb", "Space", "espace", "#311b92", "#673ab7")
+            ], alignment="center")
         ])
 
     def creer_boutons_saisons():
         return ft.Column([
-            ft.Row([btn_preset("❄️", "Winter", "hiver"), btn_preset("🌸", "Spring", "printemps"), btn_preset("☀️", "Summer", "ete")], alignment="center"),
+            ft.Row([
+                btn_preset("orb", "Winter", "hiver", "#81d4fa", "#ffffff"), 
+                btn_preset("leaf", "Spring", "printemps", "#f48fb1", "#c5e1a5"), 
+                btn_preset("orb", "Summer", "ete", "#ff9800", "#ffeb3b")
+            ], alignment="center"),
             ft.Container(height=5),
-            ft.Row([btn_preset("🍂", "Autumn", "automne"), btn_preset("🌌", "Void", "vide")], alignment="center")
+            ft.Row([
+                btn_preset("leaf", "Autumn", "automne", "#a1887f", "#ff7043"), 
+                btn_preset("orb", "Void", "vide", "#000000", "#4a148c")
+            ], alignment="center")
         ])
     
     def creer_boutons_atmos():
         return ft.Column([
-            ft.Row([btn_preset("🎋", "Zen", "zen"), btn_preset("🤖", "Cyber", "cyber"), btn_preset("☕", "LoFi", "lofi")], alignment="center"),
+            ft.Row([
+                btn_preset("leaf", "Zen", "zen", "#81c784", "#c8e6c9"), 
+                btn_preset("orb", "Cyber", "cyber", "#00e676", "#2979ff"), 
+                btn_preset("orb", "LoFi", "lofi", "#d7ccc8", "#795548")
+            ], alignment="center"),
             ft.Container(height=5),
-            ft.Row([btn_preset("🦜", "Jungle", "jungle"), btn_preset("🏭", "Indus", "indus")], alignment="center")
+            ft.Row([
+                btn_preset("leaf", "Jungle", "jungle", "#1b5e20", "#4caf50"), 
+                btn_preset("orb", "Indus", "indus", "#607d8b", "#ff5722")
+            ], alignment="center")
         ])
 
     def creer_panneau_sliders():
