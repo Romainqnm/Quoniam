@@ -3,6 +3,7 @@ import threading
 import time
 import main as moteur_audio
 import config
+import random
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
@@ -18,7 +19,8 @@ def main(page: ft.Page):
     COLORS_ATMOS    = ["#480048", "#C04848"] 
 
     # --- VARIABLES ---
-    txt_icone = ft.Text("💧", size=50)
+    # CONTENEUR ANIMÉ
+    icon_display = ft.Text("💧", size=50)
     
     # L'AURA (GLOW)
     glow_shadow = ft.BoxShadow(
@@ -29,19 +31,15 @@ def main(page: ft.Page):
         blur_style="outer" 
     )
 
-    # CONTENEUR ANIMÉ
     container_icone = ft.Container(
-        content=txt_icone,
+        content=icon_display,
         alignment=ft.Alignment(0, 0), 
         scale=1.0, 
         rotate=ft.Rotate(0, alignment=ft.Alignment(0,0)), 
         shadow=glow_shadow,
-        # LE FIX EST ICI : On arrondit les angles au max pour faire un cercle
-        # Un cercle qui tourne sur lui-même ne montre pas de coins !
         border_radius=100, 
-        width=100, # On fixe une taille pour être sûr que c'est un rond parfait
+        width=100,
         height=100,
-        
         animate_scale=ft.Animation(600, ft.AnimationCurve.EASE_IN_OUT),
         animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
@@ -52,7 +50,7 @@ def main(page: ft.Page):
     lbl_chaos = ft.Text("20%", size=12)
     switch_auto = ft.Switch(value=False, active_color="#00E5FF")
     
-    btn_play_content = ft.Text("▶  LECTURE", color="white", weight="bold")
+    btn_play_content = ft.Text("▶  PLAY", color="white", weight="bold")
     btn_play_container = ft.Container(
         content=btn_play_content, padding=15, border_radius=30, 
         alignment=ft.Alignment(0, 0), width=200, ink=True,
@@ -70,22 +68,30 @@ def main(page: ft.Page):
         content=None
     )
 
+    # HELPER NEON
+    def creer_separateur_neon(couleur="#00E5FF"):
+        return ft.Container(
+            width=120, height=2, bgcolor="#e0ffffff", border_radius=10,
+            shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color=couleur, blur_style="outer"),
+            margin=ft.Margin(left=0, top=15, right=0, bottom=15)
+        )
+
     # --- HEADER ---
     def creer_header():
         return ft.Column([
             ft.Text("Q U O N I A M", size=30, weight=ft.FontWeight.BOLD, color="white", text_align=ft.TextAlign.CENTER),
             ft.Container(
                 content=ft.Text("F L U I D   D Y N A M I C S", size=10, weight=ft.FontWeight.W_300, color="#88ffffff"),
-                margin=ft.margin.only(top=5)
+                margin=ft.Margin(left=0, top=5, right=0, bottom=0)
             ),
-            ft.Container(width=40, height=2, bgcolor="#44ffffff", margin=ft.margin.only(top=15, bottom=5), border_radius=10)
+            creer_separateur_neon("#00E5FF")
         ], horizontal_alignment="center", spacing=0)
 
     # --- BOUCLE D'ANIMATION ---
     def animer_coeur():
         angle = 0
         while True:
-            if config.ETAT["collection"] is not None and config.ETAT["actif"]:
+            if config.ETAT["actif"] and container_icone.page:
                 
                 vitesse = config.ETAT["vitesse"]
                 intensite = config.ETAT["intensite"]
@@ -102,16 +108,27 @@ def main(page: ft.Page):
                 else:
                     container_icone.animate_scale = ft.Animation(int(tempo*900), ft.AnimationCurve.EASE_IN_OUT)
 
-                # PHASE 1 : SYSTOLE
-                container_icone.scale = scale_max
+                # ANIMATION LOGIC
+                # Pulse
+                if preset in ["eau", "terre", "printemps", "zen"]:
+                     container_icone.scale = scale_max
+                     container_icone.rotate.angle = 0
                 
-                presets_tournants = ["espace", "vide", "cyber", "indus", "zen"]
-                if preset in presets_tournants:
+                # Spin
+                elif preset in ["espace", "vide", "cyber", "indus"]:
                     angle += 0.5 
                     container_icone.rotate.angle = angle
-                else:
-                    container_icone.rotate.angle = 0
+                    container_icone.scale = 1.0 # No pulse for spin
+
+                # Shake/Vibrate (Simulated by random small rotations/sales)
+                elif preset in ["feu", "ete"]:
+                    container_icone.rotate.angle = random.uniform(-0.1, 0.1)
+                    container_icone.scale = scale_max * random.uniform(0.95, 1.05)
                 
+                else: # Default hybrid
+                    container_icone.scale = scale_max
+                    container_icone.rotate.angle = 0
+
                 # Aura
                 container_icone.shadow.spread_radius = 5 + (intensite/10)
                 container_icone.shadow.color = ft.Colors.with_opacity(0.8, "white")
@@ -119,12 +136,13 @@ def main(page: ft.Page):
                 container_icone.update()
                 time.sleep(tempo)
                 
-                # PHASE 2 : DIASTOLE
+                # REST STATE
                 container_icone.scale = 1.0
-                
-                if preset in presets_tournants:
-                    angle += 0.5
-                    container_icone.rotate.angle = angle
+                if preset in ["espace", "vide", "cyber", "indus"]:
+                     angle += 0.5
+                     container_icone.rotate.angle = angle
+                else:
+                     container_icone.rotate.angle = 0
                 
                 container_icone.shadow.spread_radius = 0
                 container_icone.shadow.color = ft.Colors.with_opacity(0.3, "white")
@@ -135,8 +153,6 @@ def main(page: ft.Page):
             else:
                 time.sleep(1.0)
 
-    thread_anim = threading.Thread(target=animer_coeur, daemon=True)
-    thread_anim.start()
 
     # --- LOGIQUE UI ---
 
@@ -153,13 +169,13 @@ def main(page: ft.Page):
             "zen": "🎋", "cyber": "🤖", "lofi": "☕", "jungle": "🦜", "indus": "🏭"
         }
         if p in mapping_icones:
-            txt_icone.value = mapping_icones[p]
+            icon_display.value = mapping_icones[p]
         
         if config.ETAT["actif"]:
             btn_play_content.text = "⏸  PAUSE"
             btn_play_container.gradient = ft.LinearGradient(colors=["#ff416c", "#ff4b2b"])
         else:
-            btn_play_content.text = "▶  LECTURE"
+            btn_play_content.text = "▶  PLAY"
             btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
             
         switch_auto.value = config.ETAT["mode_auto"]
@@ -243,12 +259,12 @@ def main(page: ft.Page):
             ft.Container(height=40),
             creer_header(),
             ft.Container(height=60),
-            ft.Text("CHOISISSEZ VOTRE MONDE", size=12, color="#88ffffff"),
+            ft.Text("CHOOSE YOUR WORLD", size=12, color="#88ffffff"),
             ft.Container(height=20),
             ft.Row([
-                carte("🌱", "ÉLÉMENTS", "Nature", "elements"),
-                carte("❄️", "SAISONS", "Voyage", "saisons"),
-                carte("🎋", "ATMOS", "Exotique", "atmos")
+                carte("🌱", "ELEMENTS", "Nature", "elements"),
+                carte("❄️", "SEASONS", "Journey", "saisons"),
+                carte("🎋", "ATMOS", "Exotic", "atmos")
             ], alignment="center", spacing=15),
             ft.Container(expand=True),
             ft.Text("v4.9.1 Final Polish", size=10, color="#44ffffff")
@@ -256,14 +272,33 @@ def main(page: ft.Page):
 
     def creer_contenu_controle():
         bouton_retour = ft.Container(
-            content=ft.Text("⬅️  RETOUR", size=12, weight="bold", color="white"),
+            content=ft.Text("⬅️  BACK", size=12, weight="bold", color="white"),
             padding=10, border_radius=10, ink=True, on_click=retour_accueil
         )
+
+        # TOP ACTION BAR
+        def top_btn(text, code):
+            is_active = config.ETAT["collection"] == code
+            return ft.Container(
+                content=ft.Text(text, size=10, weight="bold", color="white" if is_active else "#88ffffff"),
+                padding=ft.Padding(left=10, top=5, right=10, bottom=5),
+                border_radius=20,
+                bgcolor="#33ffffff" if is_active else ft.Colors.TRANSPARENT,
+                ink=True,
+                on_click=lambda _: charger_interface_controle(code),
+                animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT)
+            )
+
+        top_bar = ft.Row([
+            top_btn("ELEMENTS", "elements"),
+            top_btn("SEASONS", "saisons"),
+            top_btn("ATMOS", "atmos")
+        ], alignment="center", spacing=5)
 
         header_nav = ft.Row([
             bouton_retour,
             ft.Container(expand=True),
-            ft.Text("CONTROLLER", size=12, weight="bold"),
+            top_bar,
             ft.Container(expand=True),
             ft.Container(width=70) 
         ])
@@ -273,9 +308,20 @@ def main(page: ft.Page):
             header_nav,
             ft.Container(height=10),
             container_icone, 
-            ft.Container(height=20),
-            container_presets, 
-            ft.Container(height=20),
+            creer_separateur_neon("#D500F9" if config.ETAT["collection"] == "atmos" else "#00E5FF"),
+            
+            # CONTRASTED CONTAINER FOR PRESETS
+            ft.Container(
+                content=container_presets,
+                bgcolor=ft.Colors.with_opacity(0.1, "white"),
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                border_radius=20,
+                padding=20,
+                blur=ft.Blur(10, 10),
+                margin=ft.Margin(left=20, top=0, right=20, bottom=0)
+            ),
+            
+            creer_separateur_neon("#D500F9" if config.ETAT["collection"] == "atmos" else "#00E5FF"),
             creer_panneau_sliders(),
             ft.Container(expand=True),
             btn_play_container,
@@ -294,16 +340,16 @@ def main(page: ft.Page):
 
     def creer_boutons_elements():
         return ft.Column([
-            ft.Row([btn_preset("🌱", "Terre", "terre"), btn_preset("💧", "Eau", "eau"), btn_preset("🔥", "Feu", "feu")], alignment="center"),
+            ft.Row([btn_preset("🌱", "Earth", "terre"), btn_preset("💧", "Water", "eau"), btn_preset("🔥", "Fire", "feu")], alignment="center"),
             ft.Container(height=5),
-            ft.Row([btn_preset("☁️", "Air", "air"), btn_preset("🌌", "Espace", "espace")], alignment="center")
+            ft.Row([btn_preset("☁️", "Air", "air"), btn_preset("🌌", "Space", "espace")], alignment="center")
         ])
 
     def creer_boutons_saisons():
         return ft.Column([
-            ft.Row([btn_preset("❄️", "Hiver", "hiver"), btn_preset("🌸", "Print.", "printemps"), btn_preset("☀️", "Été", "ete")], alignment="center"),
+            ft.Row([btn_preset("❄️", "Winter", "hiver"), btn_preset("🌸", "Spring", "printemps"), btn_preset("☀️", "Summer", "ete")], alignment="center"),
             ft.Container(height=5),
-            ft.Row([btn_preset("🍂", "Automne", "automne"), btn_preset("🌌", "Vide", "vide")], alignment="center")
+            ft.Row([btn_preset("🍂", "Autumn", "automne"), btn_preset("🌌", "Void", "vide")], alignment="center")
         ])
     
     def creer_boutons_atmos():
@@ -331,11 +377,11 @@ def main(page: ft.Page):
 
         return ft.Container(
             content=ft.Column([
-                ft.Row([ft.Text("⏰", size=16), ft.Text("Mode Auto", size=12, weight="bold"), ft.Container(expand=True), switch_auto], alignment="center"),
+                ft.Row([ft.Text("⏰", size=16), ft.Text("Auto Mode", size=12, weight="bold"), ft.Container(expand=True), switch_auto], alignment="center"),
                 ft.Divider(color="#33ffffff"),
-                slider_row("Vitesse", "vitesse", "🚀", lbl_vitesse),
-                slider_row("Intensité", "intensite", "🌊", lbl_intensite),
-                slider_row("Gravité", "gravite", "⚓", lbl_gravite),
+                slider_row("Speed", "vitesse", "🚀", lbl_vitesse),
+                slider_row("Intensity", "intensite", "🌊", lbl_intensite),
+                slider_row("Gravity", "gravite", "⚓", lbl_gravite),
                 slider_row("Chaos", "chaos", "🎲", lbl_chaos),
             ], spacing=10),
             padding=15
@@ -344,6 +390,10 @@ def main(page: ft.Page):
     # Lancement
     main_layout.content = creer_contenu_accueil()
     page.add(main_layout)
+    
+    # Threading correction: Start animation loop AFTER adding content to page
+    thread_anim = threading.Thread(target=animer_coeur, daemon=True)
+    thread_anim.start()
 
 if __name__ == "__main__":
     print("Lancement v4.9.1 Final Polish...")
