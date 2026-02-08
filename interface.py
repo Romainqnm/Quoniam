@@ -394,6 +394,16 @@ def main(page: ft.Page):
             btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
             
         switch_auto.value = config.ETAT["mode_auto"]
+        
+        # v10.5: Refresh Instrument Grid to show/hide excluded instruments
+        if config.ETAT["collection"] == "instruments":
+             # Re-generate buttons to apply new dimming/exclusion logic
+             try:
+                 new_controls = creer_boutons_instruments()
+                 container_presets.content = new_controls
+                 container_presets.update()
+             except: pass
+             
         page.update()
 
     def changer_valeur(e, cle):
@@ -711,34 +721,63 @@ def main(page: ft.Page):
                 # KEYS
                 "piano": assets.SVG_PIANO, "orgue": assets.SVG_ORGAN,
                 # PERCUSSION
-                "timbales": assets.SVG_DRUM, "batterie": assets.SVG_DRUM
+                "timbales": assets.SVG_DRUM, "batterie": assets.SVG_DRUM,
+                # v10.6 ETHEREAL & VOICES
+                "choir": assets.SVG_CHOIR, "voice": assets.SVG_VOICE, "celesta": assets.SVG_CELESTA,
+                "bells": assets.SVG_BELLS, "pizzicato": assets.SVG_PIZZICATO
             }
             return mapping.get(code, assets.SVG_NOTE)
 
         def btn_inst(nom, code):
             est_actif = code in config.ETAT.get("instruments_actifs", [])
+            
+            # v10.4: Check exclusion based on current emotion
+            current_emo = config.ETAT.get("emotion", "aleatoire")
+            if current_emo == "aleatoire": 
+                target = config.ETAT.get("target_emotion", "joyeux")
+            else:
+                target = current_emo
+                
+            emo_data = config.EMOTIONS.get(target, {})
+            est_exclu = code in emo_data.get("excluded", [])
+            
             svg_content = get_asset(code)
             b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
             
-            # Safe Hex Color for Icon
-            icon_color = "#FFD700" if est_actif else "#FFFFFF"
+            # Colors & Tooltip
+            if est_exclu:
+                icon_color = "#555555"
+                border_color = "#333333"
+                bg_color = ft.Colors.with_opacity(0.1, "#000000")
+                opacity = 0.3
+                tooltip = f"{nom} (Unavailable in {target} mode)"
+                on_click_action = None
+            else:
+                icon_color = "#FFD700" if est_actif else "#FFFFFF"
+                border_color = ft.Colors.with_opacity(0.5, icon_color)
+                bg_color = ft.Colors.with_opacity(0.2, "#FFD700") if est_actif else ft.Colors.TRANSPARENT
+                opacity = 1.0
+                tooltip = nom
+                on_click_action = toggle_inst
 
             return ft.Container(
                 content=ft.Column([
                     ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=30, height=30, color=icon_color, animate_scale=200),
-                    ft.Text(nom, size=10, color="white", weight="bold")
+                    ft.Text(nom, size=10, color="white" if not est_exclu else "#555555", weight="bold")
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 data=code,
-                on_click=toggle_inst,
+                on_click=on_click_action,
                 padding=10,
-                border=ft.Border.all(1, ft.Colors.with_opacity(0.5, icon_color)),
+                border=ft.Border.all(1, border_color),
                 border_radius=10,
-                bgcolor=ft.Colors.with_opacity(0.2, "#FFD700") if est_actif else ft.Colors.TRANSPARENT,
-                shadow=ft.BoxShadow(blur_radius=10, color="#FF9800" if est_actif else ft.Colors.TRANSPARENT),
-                ink=True,
+                bgcolor=bg_color,
+                shadow=ft.BoxShadow(blur_radius=10, color="#FF9800" if est_actif else ft.Colors.TRANSPARENT) if not est_exclu else None,
+                ink=not est_exclu,
+                opacity=opacity,
+                tooltip=tooltip,
                 animate_scale=200,
                 animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT),
-                width=80, height=80 # Fixed size for grid alignment
+                width=80, height=80 
             )
 
         def section(titre, instruments_list):
@@ -768,10 +807,14 @@ def main(page: ft.Page):
             config.ETAT["target_emotion"] = val 
             if val == "aleatoire":
                  config.ETAT["last_emotion_switch"] = 0 
+            
+            # v10.5: Refresh UI to update instrument availability
+            update_ui() 
         
         # Build Options List dynamically
         opts = [
             ft.dropdown.Option("aleatoire", "🎲  Random Flow"),
+            ft.dropdown.Option("creatif", "🎨  Creative (All Instruments)"),
             ft.dropdown.Option("joyeux", "☀️  Joy & Light"),
             ft.dropdown.Option("melancolique", "🌧️  Melancholy"),
             ft.dropdown.Option("action", "⚔️  Action & Epic"),
@@ -965,6 +1008,17 @@ def main(page: ft.Page):
                 ], horizontal_alignment="center")
             ], alignment="center"),
             
+            ft.Divider(color="#22ffffff"),
+            
+            # v10.6 ETHEREAL & VOICES SECTION
+            section("ETHEREAL & VOICES", [
+                ("Choir", "choir"), 
+                ("Voice", "voice"), 
+                ("Celesta", "celesta"), 
+                ("Bells", "bells"), 
+                ("Pizzicato", "pizzicato")
+            ]),
+            
         ], horizontal_alignment="center", spacing=15)
 
     def creer_panneau_sliders():
@@ -1080,7 +1134,7 @@ def main(page: ft.Page):
     thread_anim.start()
 
 if __name__ == "__main__":
-    print("Lancement v4.9.1 Final Polish...")
+    print("Lancement v10.0 Final Polish...")
     thread_son = threading.Thread(target=moteur_audio.main, daemon=True)
     thread_son.start()
     ft.app(target=main)

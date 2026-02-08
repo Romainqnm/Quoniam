@@ -88,7 +88,14 @@ def main():
             
             # v8.3 Additions
             "orgue": s.new_part("Church Organ"),
-            "batterie": s.new_part("Orchestral Kit") # Often mapped to channel 10 automatically by soundfonts
+            "batterie": s.new_part("Orchestral Kit"), # Often mapped to channel 10 automatically by soundfonts
+            
+            # v10.6 ETHEREAL & VOICES
+            "choir": s.new_part("Choir Aahs"),
+            "voice": s.new_part("Voice Oohs"),
+            "celesta": s.new_part("Celesta"),
+            "bells": s.new_part("Tubular Bells"),
+            "pizzicato": s.new_part("Pizzicato Strings")
         }
 
         # --- AUDIO EFFECTS (CC Setup) ---
@@ -154,43 +161,9 @@ def main():
                         
                     # --- EMOTION ENGINE (v9.0) ---
                     # Defines target parameters for each emotion
-                    EMOTIONS = {
-                        "joyeux": {
-                            "gamme": [60, 62, 64, 65, 67, 69, 71, 72], 
-                            "bpm": 110, "intensite": 70,
-                            "pitch_offset": 12, "min_pitch": 60, "max_pitch": 96,
-                            "preferred": ["flute", "violon", "piano", "harpe", "glockenspiel", "clarinette"],
-                            "excluded": ["contrebasse", "timbales", "tuba"]
-                        }, 
-                        "melancolique": {
-                            "gamme": [60, 62, 63, 65, 67, 68, 70, 72], 
-                            "bpm": 60, "intensite": 40,
-                            "pitch_offset": 0, "min_pitch": 48, "max_pitch": 72,
-                            "preferred": ["violoncelle", "hautbois", "cor", "piano", "guitare"],
-                            "excluded": ["trompette", "batterie", "piccolo"]
-                        },
-                        "action": {
-                            "gamme": [60, 62, 63, 65, 67, 68, 71, 72], 
-                            "bpm": 140, "intensite": 90,
-                            "pitch_offset": 0, "min_pitch": 48, "max_pitch": 84,
-                            "preferred": ["cuivres", "timbales", "batterie", "violon", "contrebasse"],
-                            "excluded": ["harpe", "celesta"]
-                        },
-                        "suspense": {
-                            "gamme": [60, 61, 63, 64, 66, 67, 69, 70], 
-                            "bpm": 75, "intensite": 50,
-                            "pitch_offset": -12, "min_pitch": 36, "max_pitch": 64, # Low register
-                            "preferred": ["contrebasse", "violoncelle", "cor", "timbales", "piano", "basse"],
-                            "excluded": ["flute", "violon", "trompette", "piccolo", "celesta"]
-                        },
-                        "epique": {
-                            "gamme": [60, 62, 64, 67, 69, 72, 74, 76], 
-                            "bpm": 100, "intensite": 95,
-                            "pitch_offset": 0, "min_pitch": 48, "max_pitch": 88,
-                            "preferred": ["cuivres", "cor", "timbales", "violon", "contrebasse", "choir"],
-                            "excluded": ["guitare", "banjo"]
-                        },
-                    }
+                    # --- EMOTION ENGINE (v10.4 Refactor) ---
+                    # Using shared definitions from config.py for UI sync
+                    EMOTIONS = config.EMOTIONS
                     
                     current_emotion = config.ETAT.get("emotion", "aleatoire")
                     
@@ -215,22 +188,20 @@ def main():
                         
                     target_data = EMOTIONS.get(target_key, EMOTIONS["joyeux"])
                     
-                    # Smooth Interpolation (Lerp) towards Target
-                    # We modify the global config to reflect the transition in UI too? 
-                    # Actually, better to keep internal 'current' values separate or just direct update config for feedback?
-                    # Let's update config so sliders move!
-                    
-                    # Smooth Interpolation (Lerp) towards Target
-                    current_bpm = config.ETAT.get("bpm", 120)
-                    target_bpm = target_data.get("bpm", 120)
-                    
-                    if abs(current_bpm - target_bpm) > 1:
-                        config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.05
+                    # --- INTERPOLATION LOGIC ---
+                    # Only interpolate (drift) parameters if Auto Mode is ON.
+                    # Otherwise, respect the manual sliders completely.
+                    if config.ETAT.get("mode_auto", False):
+                        current_bpm = config.ETAT.get("bpm", 120)
+                        target_bpm = target_data.get("bpm", 120)
                         
-                    current_i = config.ETAT["intensite"]
-                    target_i = target_data.get("intensite", 50)
-                    if abs(current_i - target_i) > 1:
-                        config.ETAT["intensite"] += (target_i - current_i) * 0.05
+                        if abs(current_bpm - target_bpm) > 1:
+                            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.05
+                            
+                        current_i = config.ETAT["intensite"]
+                        target_i = target_data.get("intensite", 50)
+                        if abs(current_i - target_i) > 1:
+                            config.ETAT["intensite"] += (target_i - current_i) * 0.05
                     
                     gamme = target_data["gamme"]
                     
@@ -277,12 +248,24 @@ def main():
                                 threshold = 0.9 # Higher chance to play
                             
                             if random.random() < threshold: 
+                                # Voice Throttling for Polyphony Safety
+                                # If many instruments are active, skip some notes to prevent "Ringbuffer full"
+                                density = len(actifs)
+                                if density > 8 and random.random() < 0.3: continue
+                                if density > 12 and random.random() < 0.5: continue
+
                                 inst = instruments[inst_name]
                                 vol = 0.2 + (intensite / 200.0)
                                 vol = humaniser(vol, 0.15) 
                                 
-                                base_sustain = 2.5 
-                                if inst_name in ["piano", "harpe", "guitare"]: base_sustain = 3.5 
+                                # Dynamic Sustain based on density to prevent polyphony overflow
+                                density = len(actifs)
+                                base_sustain = 2.5
+                                if density > 4: base_sustain = 1.8
+                                if density > 8: base_sustain = 1.2
+                                
+                                if inst_name in ["piano", "harpe", "guitare"]: base_sustain += 1.0
+                                
                                 sustain = base_sustain * random.uniform(0.8, 1.4)
                                 
                                 # v9.1 Logic: Emotion-based Pitch Control

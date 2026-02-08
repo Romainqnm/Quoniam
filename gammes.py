@@ -27,5 +27,14 @@ PACK_ATMOS = {
     "indus": [36, 42, 43, 48, 49, 54, 55, 60, 61, 66, 67, 72, 73, 78, 79]
 }
 
+# --- PACK 4 : ETHEREAL & VOICES ---
+PACK_ETHEREAL = {
+    "choir": [48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72],  # Major scale, slow
+    "voice": [48, 50, 51, 53, 55, 56, 58, 60, 62, 63, 65, 67, 68, 70, 72],  # Melodic minor
+    "celesta": [48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76],  # Lydian (magical)
+    "bells": [48, 50, 53, 55, 57, 60, 62, 65, 67, 69, 72, 74, 77, 79, 81],  # Pentatonic (mystical)
+    "pizzicato": [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84]  # Staccato scale (higher register)
+}
+
 # Registre Global
-TOUTES_GAMMES = {**PACK_ELEMENTS, **PACK_SAISONS, **PACK_ATMOS}
+TOUTES_GAMMES = {**PACK_ELEMENTS, **PACK_SAISONS, **PACK_ATMOS, **PACK_ETHEREAL}
