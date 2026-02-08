@@ -171,24 +171,69 @@ def main(page: ft.Page):
             )
 
         def update(self, theme_mode):
-            # v13.3: Audio-Reactive Visualizer Logic
-            # Pulse size based on audio intensity
+            # v14.0: Audio-Reactive Advanced Visuals
             intensity = config.ETAT.get("intensite", 30)
             bpm = config.ETAT.get("bpm", 120)
             
-            # Simple rhythmic pulse
+            # Pulse size based on audio intensity
             pulse = math.sin(time.time() * (bpm / 60.0) * math.pi) 
             scale_factor = 1.0 + (intensity / 100.0 * 0.5) + (pulse * 0.2)
             self.container.scale = scale_factor
             
             # Speed Factor
-            speed_factor = 1.0 + (intensity / 100.0)
+            speed_factor = 0.5 + (intensity / 50.0)
 
-            # Update Position
-            self.x += self.vx * 10 * speed_factor
-            self.y += self.vy * 10 * speed_factor
-            
-            # Wrap around screen
+            # Theme Behavior
+            if theme_mode == "elements": # Rising Bubbles
+                self.vy = -1.0 * speed_factor - random.uniform(0, 1)
+                self.vx = math.sin(time.time() + self.x) * 0.5 # Wobble
+                if random.random() < 0.05: self.opacity = random.uniform(0.1, 0.6)
+                
+            elif theme_mode == "saisons": # Falling Petals
+                self.vy = 1.0 * speed_factor + random.uniform(0, 1)
+                self.vx = math.cos(time.time() + self.y) * 1.5 # Sway
+                self.container.rotate.angle += 0.05
+                
+            elif theme_mode == "atmos": # Cyber/Static
+                # Glitch movement
+                if random.random() < 0.05:
+                     self.x = random.uniform(0, self.page_width)
+                     self.y = random.uniform(0, self.page_height)
+                self.vx = 0
+                self.vy = 0
+                self.opacity = random.uniform(0.1, 0.5) + (pulse * 0.1)
+
+            elif theme_mode == "instruments": # ORCHESTRA: Orbiting Stars
+                # Orchestra Mode: Orbit around center
+                center_x = self.page_width / 2
+                center_y = self.page_height / 3 # Near the icon
+                
+                dx = self.x - center_x
+                dy = self.y - center_y
+                dist = math.sqrt(dx*dx + dy*dy) + 1
+                
+                # Orbit logic
+                angle = math.atan2(dy, dx)
+                angle += 0.02 * speed_factor # Rotate
+                
+                # Spiral out/in based on intensity
+                radius = dist + math.sin(time.time()) * 2
+                
+                # Reposition
+                self.x = center_x + math.cos(angle) * radius
+                self.y = center_y + math.sin(angle) * radius
+                
+                self.container.bgcolor = "#FFD700" if random.random() < 0.3 else "white"
+
+            else: # Home / Default (Slow float)
+                self.container.bgcolor = "white"
+                self.vx = random.uniform(-0.5, 0.5)
+                self.vy = random.uniform(-0.5, 0.5)
+
+            # Update Position (unless overridden by specific themes like atmos/orchestra which set x/y directly)
+            if theme_mode not in ["atmos", "instruments"]:
+                self.x += self.vx
+                self.y += self.vy
             
             # Wrap around screen
             if self.x > self.page_width: self.x = 0
@@ -198,46 +243,7 @@ def main(page: ft.Page):
             
             self.container.left = self.x
             self.container.top = self.y
-            
-            # Theme Behavior
-            if theme_mode == "elements": # Rising Bubbles
-                self.vy = random.uniform(-2.0, -0.5)
-                self.vx = random.uniform(-0.5, 0.5)
-                
-                # Sync color with preset
-                p = config.ETAT["preset"] # Fix UnboundLocalError
-                if p in PRESET_THEMES:
-                    kind, c1, c2 = PRESET_THEMES[p]
-                    if random.random() < 0.5: self.container.bgcolor = c1
-                    else: self.container.bgcolor = c2
-
-            elif theme_mode == "saisons": # Falling Petals
-                self.vy = random.uniform(0.5, 2.0)
-                self.vx = random.uniform(-1.0, 1.0)
-                self.container.width = random.randint(5, 15)
-                self.container.height = self.container.width
-                
-                # Sync color with preset
-                p = config.ETAT["preset"]
-                if p in PRESET_THEMES:
-                    kind, c1, c2 = PRESET_THEMES[p]
-                    self.container.bgcolor = c1 if random.random() < 0.5 else c2
-
-            elif theme_mode == "atmos": # Cyber/Static
-                # Sync color with preset
-                p = config.ETAT["preset"]
-                if p in PRESET_THEMES:
-                    kind, c1, c2 = PRESET_THEMES[p]
-                    self.container.bgcolor = c1 if random.random() < 0.5 else c2
-
-                if random.random() < 0.1: # Flicker move
-                    self.x = random.uniform(0, self.page_width)
-                    self.y = random.uniform(0, self.page_height)
-                
-            else: # Home / Default (Slow float)
-                self.container.bgcolor = "white"
-                self.vx = random.uniform(-0.5, 0.5)
-                self.vy = random.uniform(-0.5, 0.5)
+            self.container.opacity = self.opacity
 
     particles = [Particle(450, 800) for _ in range(20)]
     particle_layer = ft.Stack([p.container for p in particles])
@@ -245,9 +251,11 @@ def main(page: ft.Page):
     def animer_fond():
         while True:
             current_theme = "home"
-            if config.ETAT["collection"] == "elements": current_theme = "elements"
-            elif config.ETAT["collection"] == "saisons": current_theme = "saisons"
-            elif config.ETAT["collection"] == "atmos": current_theme = "atmos"
+            coll = config.ETAT.get("collection")
+            if coll == "elements": current_theme = "elements"
+            elif coll == "saisons": current_theme = "saisons"
+            elif coll == "atmos": current_theme = "atmos"
+            elif coll == "instruments": current_theme = "instruments"
             
             for p in particles:
                 p.update(current_theme)
@@ -256,7 +264,7 @@ def main(page: ft.Page):
                 # v13.3 Fix: Update only the layer, not the whole page (Concurrency Crash Fix)
                 particle_layer.update()
             except: pass
-            time.sleep(0.1)
+            time.sleep(0.05) # Smoother 20FPS
 
     # --- GLOBAL AUDIO PLAYER (v13.0 - Pygame Backend) ---
     # --- GLOBAL AUDIO PLAYER (v13.3 - Dual Channel Crossfade) ---
@@ -433,6 +441,7 @@ def main(page: ft.Page):
         ], horizontal_alignment="center", spacing=0)
 
     # --- BOUCLE D'ANIMATION ---
+    # --- BOUCLE D'ANIMATION ---
     def animer_coeur():
         angle = 0
         while True:
@@ -443,58 +452,34 @@ def main(page: ft.Page):
                     continue
                     
                 if config.ETAT["actif"]:    
-                    vitesse = config.ETAT["vitesse"]
-                    intensite = config.ETAT["intensite"]
-                    preset = config.ETAT["preset"]
+                    bpm = config.ETAT.get("bpm", 60)
+                    intensite = config.ETAT.get("intensite", 50)
                     
-                    tempo_base = 2.0 - (vitesse / 55.0)
-                    tempo = max(0.35, tempo_base)
+                    # Unified Breathing Logic (Sine Wave)
+                    # Smooth, continuous expansion/contraction linked to BPM
+                    t = time.time()
+                    cycle = math.sin(t * (bpm / 60.0) * math.pi) # -1 to 1
                     
-                    scale_max = 1.0 + (intensite / 250.0) 
+                    # Convert sine to 0-1 scale range
+                    # Base scale 1.0, max scale depends on intensity
+                    max_growth = 0.2 + (intensite / 200.0) # 0.2 to 0.7 extra
+                    current_scale = 1.0 + (max_growth * abs(cycle))
                     
-                    nervous_presets = ["feu", "cyber", "indus", "ete"]
-                    if preset in nervous_presets:
-                        container_icone.animate_scale = ft.Animation(int(tempo*500), ft.AnimationCurve.ELASTIC_OUT)
-                    else:
-                        container_icone.animate_scale = ft.Animation(int(tempo*900), ft.AnimationCurve.EASE_IN_OUT)
-
-                    # ANIMATION LOGIC (v12.0: Rhythmic Breathing)
-                    current_scale = container_icone.scale
+                    container_icone.scale = current_scale
+                    container_icone.update()
                     
-                    # 1. BEAT (Expansion rapide)
-                    if preset in ["eau", "terre", "printemps", "zen", "ete", "feu", "automne", "jungle", "lofi"]:
-                         # Heartbeat effect
-                         container_icone.scale = scale_max
-                         container_icone.animate_scale = ft.Animation(100, ft.AnimationCurve.EASE_OUT) # Quick expand
-                         container_icone.update()
-                         
-                         time.sleep(0.15) # Hold peak slightly
-                         
-                         # 2. DECAY (Relachement lent synchronisé au tempo)
-                         container_icone.scale = 1.0
-                         container_icone.animate_scale = ft.Animation(int(tempo * 800), ft.AnimationCurve.EASE_IN_OUT) # Slow decay
-                         container_icone.update()
+                    # Aura Pulse (Sync with cycle)
+                    container_icone.shadow.spread_radius = 5 + (intensite/5) * abs(cycle)
+                    container_icone.shadow.color = ft.Colors.with_opacity(0.3 + (abs(cycle)*0.3), "white")
                     
-                    # Special Spin Logic (Space/Cyber)
-                    elif preset in ["espace", "vide", "cyber", "indus"]:
+                    # Spin for Space Themes
+                    if config.ETAT.get("preset") in ["espace", "vide", "cyber", "indus"]:
                         angle += 1.0 
                         container_icone.rotate.angle = angle
-                        container_icone.scale = 1.0 # No pulse for spin
-                        container_icone.update()
-
-                    # Aura Pulse
-                    container_icone.shadow.spread_radius = 5 + (intensite/8)
-                    container_icone.shadow.color = ft.Colors.with_opacity(0.6, "white")
+                    
                     container_icone.update()
                     
-                    # Wait for next beat (approximate)
-                    sleep_time = max(0.4, tempo - 0.15)
-                    time.sleep(sleep_time)
-                    
-                    # Rest of cycle cleanup
-                    container_icone.shadow.spread_radius = 2
-                    container_icone.shadow.color = ft.Colors.with_opacity(0.2, "white")
-                    container_icone.update()
+                    time.sleep(0.05) # fast loop for smooth animation
                 else:
                     time.sleep(1.0)
             except Exception as e:
@@ -1601,6 +1586,10 @@ def main(page: ft.Page):
     # Threading correction: Start animation loop AFTER adding content to page
     thread_anim = threading.Thread(target=animer_coeur, daemon=True)
     thread_anim.start()
+
+    # v14.0: Start Background Animation
+    thread_fond = threading.Thread(target=animer_fond, daemon=True)
+    thread_fond.start()
 
 if __name__ == "__main__":
     print("Lancement v10.0 Final Polish...")
