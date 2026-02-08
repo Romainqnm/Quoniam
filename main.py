@@ -1,4 +1,4 @@
-# main.py - MOTEUR AUDIO v4.5 (LIQUID SOUL + SOUNDFONT)
+# main.py - MOTEUR AUDIO v8.3 (LIQUID SOUL + SOUNDFONT)
 from scamp import Session, wait, fork
 import random
 import os
@@ -78,8 +78,32 @@ def main():
             "clarinette": s.new_part("Clarinet"),
             "guitare": s.new_part("Acoustic Guitar (steel)"),
             "basse": s.new_part("Acoustic Bass"),
-            "harpe": s.new_part("Orchestral Harp")
+            "harpe": s.new_part("Orchestral Harp"),
+            # NEW INSTRUMENTS (v8.2)
+            "cuivres": s.new_part("Brass Section"),
+            "timbales": s.new_part("Timpani"),
+            "hautbois": s.new_part("Oboe"),
+            "cor": s.new_part("French Horn"),
+            
+            # v8.3 Additions
+            "orgue": s.new_part("Church Organ"),
+            "batterie": s.new_part("Orchestral Kit") # Often mapped to channel 10 automatically by soundfonts
         }
+
+        # --- AUDIO EFFECTS (CC Setup) ---
+        print("🎛️  Initialisation CC (Reverb/Chorus)...")
+        for name, part in instruments.items():
+            try:
+                # CC 91 = Reverb (General MIDI standard)
+                part.play_note(0, 0, 0) # Wake up channel
+                s.send_message(part, 176, part.midi_channel, 91, 95) # High Reverb (Hall)
+                
+                # CC 93 = Chorus (Ensemble effect)
+                if name in ["violon", "violoncelle", "contrebasse", "cuivres", "cor", "orgue"]:
+                    s.send_message(part, 176, part.midi_channel, 93, 80) # High Chorus for ensemble/organ
+                else:
+                    s.send_message(part, 176, part.midi_channel, 93, 0)
+            except: pass
     except Exception as e:
         print(f"❌ Erreur chargement instrument : {e}")
         return
@@ -160,7 +184,13 @@ def main():
                             # Probabilistic play to avoid clutter
                             if random.random() < 0.7: 
                                 vol = 0.2 + (intensite / 200.0)
-                                sustain = 1.5
+                                vol = humaniser(vol, 0.15) # Humanize volume
+                                
+                                # Natural Decay for Orchestra
+                                base_sustain = 2.5 
+                                if inst_name in ["piano", "harpe", "guitare"]: base_sustain = 3.5 # Plucked/Struck strings resonate longer
+                                
+                                sustain = base_sustain * random.uniform(0.8, 1.4)
                                 
                                 # Pitch variation per instrument class for harmony
                                 pitch = note_courante
@@ -191,7 +221,7 @@ def main():
                 facteur_lent = 2.0 if preset in presets_lents else 1.0
                 
                 attente = (1.0 - (vitesse / 120.0)) * facteur_lent
-                attente = max(0.2, humaniser(attente, 0.2)) # Increased min wait from 0.15 to 0.2
+                attente = max(0.2, humaniser(attente, 0.2))
 
                 seuil_jeu = 0.35 + (intensite / 200.0)
                 
@@ -212,13 +242,25 @@ def main():
                     note_finale = note_brute + (gravite * 12)
                     
                     vol = 0.25 + (intensite / 180.0)
-                    vol = humaniser(vol, 0.1)
-                    sustain = 1.5 # Reduced from 2.5 to 1.5 to free up voices
+                    vol = humaniser(vol, 0.15) # More humanization
                     
+                    # NATURAL DECAY LOGIC
+                    # Sustain is now much longer to allow fade out
+                    base_sustain = 3.0 
+                    if intensite > 70: base_sustain = 4.0
+                    
+                    # Random variation for "organic" feel
+                    sustain = base_sustain * random.uniform(0.8, 1.5)
+                    
+                    # Occasional "staccato" (short note) based on Chaos
+                    if random.random() * 100 < chaos * 0.5:
+                        sustain = 0.5
+
                     if intensite > 65 and random.random() < 0.35:
                         acc = trouver_accords(note_finale, gamme)
                         for n in acc:
-                            wait(0.1) # Increased from 0.06 to 0.1
+                            wait(0.1) 
+                            # Non-blocking play with long sustain allows overlap
                             inst.play_note(n, vol*0.85, attente*sustain, blocking=False)
                     else:
                         inst.play_note(note_finale, vol, attente*sustain, blocking=False)

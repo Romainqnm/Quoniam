@@ -9,9 +9,11 @@ import assets_library as assets
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v5.0"
+    page.title = "QUONIAM v8.3"
     page.theme_mode = "dark"
     page.bgcolor = "#1a1a1a"
+    page.window_title_bar_hidden = True
+    page.window_title_bar_buttons_hidden = True
     page.window_width = 450
     page.window_height = 800
     page.padding = 0 
@@ -262,6 +264,9 @@ def main(page: ft.Page):
     # Layer 1: Particles (particle_layer)
     # Layer 2: Main Content (Will be set in main_layout_stack.controls)
     
+    # TITLE BAR REMOVED PER USER REQUEST
+    # The application will remain frameless but without custom controls for now.
+
     main_layout_stack = ft.Stack(
         [
             bg_gradient,
@@ -526,7 +531,7 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Row(controls=liste_cartes, alignment="center", wrap=True, spacing=10),
             ft.Container(expand=True),
-            ft.Text("v5.0 Liquid Glass Edition", size=10, color="#44ffffff")
+            ft.Text("v8.3 Final Release", size=10, color="#44ffffff")
         ], horizontal_alignment="center")
 
     def creer_contenu_controle():
@@ -681,25 +686,32 @@ def main(page: ft.Page):
             
             if inst in actifs:
                 actifs.remove(inst)
-                e.control.bgcolor = ft.Colors.with_opacity(0.1, "white")
-                e.control.border = ft.Border.all(1, ft.Colors.with_opacity(0.15, "white"))
+                e.control.bgcolor = ft.Colors.TRANSPARENT
+                e.control.border = ft.Border.all(1, ft.Colors.with_opacity(0.5, "#FFFFFF")) # White Hex
                 e.control.shadow.color = ft.Colors.TRANSPARENT
+                e.control.content.controls[0].color = "#FFFFFF" # Icon White
             else:
                 actifs.append(inst)
-                e.control.bgcolor = ft.Colors.with_opacity(0.3, "gold")
-                e.control.border = ft.Border.all(1, "gold")
-                e.control.shadow.color = "orange"
+                e.control.bgcolor = ft.Colors.with_opacity(0.2, "#FFD700") # Gold Hex
+                e.control.border = ft.Border.all(1, "#FFD700") # Gold Hex
+                e.control.shadow.color = "#FF9800" # Orange Hex
+                e.control.content.controls[0].color = "#FFD700" # Icon Gold
                 
             config.ETAT["instruments_actifs"] = actifs
             e.control.update()
 
         def get_asset(code):
             mapping = {
-                "piano": assets.SVG_PIANO,
+                # STRINGS
                 "violon": assets.SVG_VIOLIN, "violoncelle": assets.SVG_CELLO, "contrebasse": assets.SVG_CONTRABASS,
-                "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS,
-                "flute": assets.SVG_FLUTE, "clarinette": assets.SVG_CLARINET,
-                "harpe": assets.SVG_HARP
+                "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS, "harpe": assets.SVG_HARP,
+                # WINDS
+                "flute": assets.SVG_FLUTE, "clarinette": assets.SVG_CLARINET, 
+                "hautbois": assets.SVG_OBOE, "trompette": assets.SVG_TRUMPET, "cor": assets.SVG_HORN, "cuivres": assets.SVG_TRUMPET, # Fallback
+                # KEYS
+                "piano": assets.SVG_PIANO, "orgue": assets.SVG_ORGAN,
+                # PERCUSSION
+                "timbales": assets.SVG_DRUM, "batterie": assets.SVG_DRUM
             }
             return mapping.get(code, assets.SVG_NOTE)
 
@@ -708,30 +720,59 @@ def main(page: ft.Page):
             svg_content = get_asset(code)
             b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
             
+            # Safe Hex Color for Icon
+            icon_color = "#FFD700" if est_actif else "#FFFFFF"
+
             return ft.Container(
                 content=ft.Column([
-                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=30, height=30, color="gold" if est_actif else "white", animate_scale=200),
+                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=30, height=30, color=icon_color, animate_scale=200),
                     ft.Text(nom, size=10, color="white", weight="bold")
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 data=code,
                 on_click=toggle_inst,
-                width=75, height=75,
-                border_radius=15,
-                bgcolor=ft.Colors.with_opacity(0.3 if est_actif else 0.1, "gold" if est_actif else "white"),
-                border=ft.Border.all(1, "gold" if est_actif else ft.Colors.with_opacity(0.15, "white")),
-                shadow=ft.BoxShadow(blur_radius=10, color="orange" if est_actif else ft.Colors.TRANSPARENT),
+                padding=10,
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.5, icon_color)),
+                border_radius=10,
+                bgcolor=ft.Colors.with_opacity(0.2, "#FFD700") if est_actif else ft.Colors.TRANSPARENT,
+                shadow=ft.BoxShadow(blur_radius=10, color="#FF9800" if est_actif else ft.Colors.TRANSPARENT),
                 ink=True,
-                animate_scale=200
+                animate_scale=200,
+                animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT),
+                width=80, height=80 # Fixed size for grid alignment
             )
 
+        def section(titre, instruments_list):
+            return ft.Column([
+                ft.Text(titre, size=12, weight="bold", color="#88ffffff"),
+                ft.Row([btn_inst(n, c) for n, c in instruments_list], alignment="center", wrap=True, spacing=10)
+            ], horizontal_alignment="center", spacing=5)
+
         return ft.Column([
-            ft.Text("KEYS & STRINGS", size=10, color="#88ffffff", weight="bold"),
-            ft.Row([btn_inst("Piano", "piano"), btn_inst("Violin", "violon"), btn_inst("Cello", "violoncelle")], alignment="center"),
-            ft.Row([btn_inst("Harp", "harpe"), btn_inst("Guitar", "guitare"), btn_inst("Bass", "basse")], alignment="center"),
+            ft.Text("ORCHESTRA", size=18, weight="bold", color="white"),
+            ft.Container(height=10),
+            
+            # STRINGS SECTIONS
+            section("STRINGS", [("Violin", "violon"), ("Cello", "violoncelle"), ("Bass", "contrebasse"), ("Harp", "harpe"), ("Guitar", "guitare")]),
             ft.Divider(color="#22ffffff"),
-            ft.Text("WINDS & MORE", size=10, color="#88ffffff", weight="bold"),
-            ft.Row([btn_inst("Flute", "flute"), btn_inst("Clarinet", "clarinette"), btn_inst("C.Bass", "contrebasse")], alignment="center"),
-        ], horizontal_alignment="center", spacing=5)
+            
+            # WINDS SECTION
+            section("WINDS & BRASS", [("Flute", "flute"), ("Clarinet", "clarinette"), ("Oboe", "hautbois"), ("Horn", "cor"), ("Brass", "cuivres")]),
+            ft.Divider(color="#22ffffff"),
+            
+            # KEYS & PERCUSSION SECTION (Mixed Row)
+            ft.Row([
+                ft.Column([
+                    ft.Text("KEYS", size=12, weight="bold", color="#88ffffff"),
+                    ft.Row([btn_inst("Piano", "piano"), btn_inst("Organ", "orgue")], spacing=5)
+                ], horizontal_alignment="center"),
+                ft.Container(width=10),
+                ft.Column([
+                    ft.Text("PERCUSSION", size=12, weight="bold", color="#88ffffff"),
+                    ft.Row([btn_inst("Timpani", "timbales"), btn_inst("Drums", "batterie")], spacing=5)
+                ], horizontal_alignment="center")
+            ], alignment="center"),
+            
+        ], horizontal_alignment="center", spacing=15, scroll=ft.ScrollMode.HIDDEN)
 
     def creer_panneau_sliders():
         switch_auto.on_change = toggle_auto

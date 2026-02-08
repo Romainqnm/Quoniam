@@ -66,3 +66,33 @@ SVG_HARP = """
   <path d="M11 2c-4 0-7 3-7 7v10c0 1.1.9 2 2 2h8c2.21 0 4-1.79 4-4V7c0-2.76-2.24-5-5-5h-2zm-1 2h2c1.65 0 3 1.35 3 3v12c0 1.1-.9 2-2 2H6.8c-.45 0-.8-.35-.8-.8v-9.4c0-2.65 2.15-4.8 4.8-4.8z"/>
 </svg>
 """
+
+SVG_TRUMPET = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M22 17h-2v-6h-2v6h-2v-6h-2v6l-2 0V9c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v2h2v6zM2 13l4.5-3v6L2 13z"/>
+</svg>
+"""
+
+SVG_HORN = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 2c-4.97 0-9 4.03-9 9 0 4.97 4.03 9 9 9s9-4.03 9-9h-2c0 3.86-3.14 7-7 7s-7-3.14-7-7 3.14-7 7-7v2l4-3-4-3v2z"/>
+</svg>
+"""
+
+SVG_DRUM = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 2C6.48 2 2 3.5 2 5.5v13C2 20.5 6.48 22 12 22s10-1.5 10-3.5v-13C22 3.5 17.5 2 12 2zm0 2c3.5 0 8 1 8 1.5S15.5 7 12 7 4 6 4 5.5 8.5 4 12 4zm0 16c-3.1 0-7-1-7-1.5V11c1.5 1 4 1.5 7 1.5s5.5-.5 7-1.5v7.5c0 .5-3.9 1.5-7 1.5z"/>
+</svg>
+"""
+
+SVG_OBOE = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 2L11 2v18l1.5 2L14 20V2l-1 0zM12 5h1v1h-1V5zm0 3h1v1h-1V8zm0 3h1v1h-1v-1zm0 3h1v1h-1v-1z"/>
+</svg>
+"""
+
+SVG_ORGAN = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M4 3h16v18H4V3zm2 2v9h2V5H6zm3 0v11h2V5H9zm3 0v13h2V5h-2zm3 0v9h2V5h-2zm3 0v7h2V5h-2z"/>
+</svg>
+"""
