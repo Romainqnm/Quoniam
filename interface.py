@@ -810,18 +810,32 @@ def main(page: ft.Page):
                     base_color = EMOTION_COLORS.get(val, "white")
                 
                 # Apply Styles
-                btn.bgcolor = ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white")
-                btn.border = ft.Border.all(2, base_color) if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.1, "white"))
-                btn.content.color = base_color if is_active else "#88ffffff"
-                btn.content.weight = "bold" if is_active else "normal"
-                btn.scale = 1.1 if is_active else 1.0
-                btn.update()
+                try:
+                    btn.bgcolor = ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white")
+                    btn.border = ft.Border.all(2, base_color) if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.1, "white"))
+                    btn.content.color = base_color if is_active else "#88ffffff"
+                    btn.content.weight = "bold" if is_active else "normal"
+                    btn.scale = 1.1 if is_active else 1.0
+                    btn.update()
+                except RuntimeError:
+                    pass
 
         def change_emotion(e):
             val = e.control.data
             print(f"🖱️ UI: Change Emotion -> {val}")
             
-            # Identify if it is a profile (placeholder for now as profile list is separate)
+            # Load Profile Data
+            if val.startswith("profile_"):
+                p_name = val.replace("profile_", "")
+                p_data = config.ETAT["custom_profiles"].get(p_name)
+                if p_data:
+                    config.ETAT["bpm"] = p_data.get("bpm", 120)
+                    config.ETAT["instruments_actifs"] = list(p_data.get("actifs", []))
+                    config.ETAT["chaos"] = p_data.get("chaos", 100)
+                    config.ETAT["gravite"] = p_data.get("gravite", 0)
+                    print(f"📂 Loaded Profile: {p_name}")
+                    # Update active instruments visual
+                    update_ui()
             
             config.ETAT["emotion"] = val
             config.ETAT["target_emotion"] = val 
@@ -836,10 +850,17 @@ def main(page: ft.Page):
         def emotion_btn(icon, val, tooltip):
              # Initial State Calculation
              is_active = config.ETAT.get("emotion") == val
-             base_color = EMOTION_COLORS.get(val, "white")
+             
+             # Determine Color
+             if val.startswith("profile_"):
+                 base_color = "#00BCD4" # Cyan
+             else:
+                 base_color = EMOTION_COLORS.get(val, "white")
              
              return ft.Container(
-                content=ft.Text(icon, size=20, color=base_color if is_active else "#88ffffff", weight="bold" if is_active else "normal"),
+                content=ft.Text(icon, size=16 if val.startswith("profile_") else 20, 
+                               color=base_color if is_active else "#88ffffff", 
+                               weight="bold" if is_active else "normal"),
                 padding=10,
                 bgcolor=ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white"),
                 border_radius=10,
@@ -862,6 +883,22 @@ def main(page: ft.Page):
             emotion_btn("🕵️", "suspense", "Suspense"),
             emotion_btn("🏰", "epique", "Epic"),
         ], alignment="center", spacing=10)
+        
+        # Container for Custom Profiles Buttons
+        row_custom_profiles = ft.Row(alignment="center", spacing=10, wrap=True)
+
+        def refresh_profiles_row():
+            items = []
+            for name in config.ETAT.get("custom_profiles", {}):
+                items.append(emotion_btn(f"👤 {name}", f"profile_{name}", f"Load {name}"))
+            row_custom_profiles.controls = items
+            try:
+                if row_custom_profiles.page: row_custom_profiles.update()
+            except RuntimeError:
+                pass
+
+        # Initial Load
+        refresh_profiles_row()
         
         # --- PROFILE MANAGEMENT (Restored v10.9) ---
         def show_dialog(title, content, actions):
@@ -910,13 +947,18 @@ def main(page: ft.Page):
                     "bpm": config.ETAT.get("bpm", 120),
                     "actifs": list(config.ETAT.get("instruments_actifs", [])),
                     "chaos": config.ETAT.get("chaos", 100),
-                    "gravite": config.ETAT.get("gravite", 0)
+                    "gravite": config.ETAT.get("gravite", 0),
+                    # Store current 'emotion' mode if needed, or just treat as 'custom'
                 }
                 
                 if "custom_profiles" not in config.ETAT: config.ETAT["custom_profiles"] = {}
                 config.ETAT["custom_profiles"][name] = profile_data
                 
                 print(f"💾 Profil sauvegardé : {name}")
+                
+                # REFRESH UI
+                refresh_profiles_row()
+                
                 main_layout_stack.controls.pop()
                 page.update()
                 
@@ -926,10 +968,15 @@ def main(page: ft.Page):
                 btn_save.update()
                 import time
                 def reset_btn():
+                    import time
                     time.sleep(2)
-                    btn_save.content.value = "💾 SAVE PROFILE"
-                    btn_save.content.color = "#88ffffff"
-                    btn_save.update()
+                    try:
+                        if not btn_save.page: return # Safety check
+                        btn_save.content.value = "💾 SAVE PROFILE"
+                        btn_save.content.color = "#88ffffff"
+                        btn_save.update()
+                    except RuntimeError:
+                        pass
                 threading.Thread(target=reset_btn, daemon=True).start()
 
             show_dialog("Save Profile", txt_name, [
@@ -988,7 +1035,11 @@ def main(page: ft.Page):
             ft.Text("MOOD", size=12, weight="bold", color="#88ffffff"),
             row_emotions,
             
-            ft.Container(height=20), # Spacer before Save
+            ft.Container(height=10),
+            row_custom_profiles, # Added Profiles Row
+            ft.Container(height=10),
+            
+            # ft.Container(height=20), # Spacer before Save
             btn_save,
             ft.Container(height=10),
             
