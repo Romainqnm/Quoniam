@@ -762,12 +762,12 @@ def main(page: ft.Page):
 
             return ft.Container(
                 content=ft.Column([
-                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=30, height=30, color=icon_color, animate_scale=200),
-                    ft.Text(nom, size=10, color="white" if not est_exclu else "#555555", weight="bold")
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=40, height=40, color=icon_color, fit="contain"),
+                    ft.Text(nom, size=10, color="white" if not est_exclu else "#555555", weight="bold", text_align="center", max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
                 data=code,
                 on_click=on_click_action,
-                padding=10,
+                padding=5,
                 border=ft.Border.all(1, border_color),
                 border_radius=10,
                 bgcolor=bg_color,
@@ -775,8 +775,7 @@ def main(page: ft.Page):
                 ink=not est_exclu,
                 opacity=opacity,
                 tooltip=tooltip,
-                animate_scale=200,
-                animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT),
+                animate_scale=ft.Animation(300, ft.AnimationCurve.EASE_OUT) if est_actif else None,
                 width=80, height=80 
             )
 
@@ -786,206 +785,46 @@ def main(page: ft.Page):
                 ft.Row([btn_inst(n, c) for n, c in instruments_list], alignment="center", wrap=True, spacing=10)
             ], horizontal_alignment="center", spacing=5)
 
+        # Handlers for Emotion Buttons
         def change_emotion(e):
-            val = e.control.value
-            
-            # Check if it's a custom profile
-            if val.startswith("profile_"):
-                profile_name = val.replace("profile_", "")
-                if profile_name in config.ETAT.get("custom_profiles", {}):
-                    data = config.ETAT["custom_profiles"][profile_name]
-                    # Load state
-                    config.ETAT["bpm"] = data.get("bpm", 120)
-                    config.ETAT["instruments_actifs"] = data.get("actifs", [])
-                    config.ETAT["chaos"] = data.get("chaos", 100)
-                    config.ETAT["gravite"] = data.get("gravite", 0)
-                    config.ETAT["emotion"] = "custom" # Lock emotion logic to avoid override
-                    print(f"📂 Profil chargé : {profile_name}")
-                    return
-
+            val = e.control.data
             print(f"🖱️ UI: Change Emotion -> {val}")
             config.ETAT["emotion"] = val
             config.ETAT["target_emotion"] = val 
             if val == "aleatoire":
                  config.ETAT["last_emotion_switch"] = 0 
             
-            # v10.5: Refresh UI to update instrument availability
-            update_ui() 
-        
-        # Build Options List dynamically
-        opts = [
-            ft.dropdown.Option("aleatoire", "🎲  Random Flow"),
-            ft.dropdown.Option("creatif", "🎨  Creative (All Instruments)"),
-            ft.dropdown.Option("joyeux", "☀️  Joy & Light"),
-            ft.dropdown.Option("melancolique", "🌧️  Melancholy"),
-            ft.dropdown.Option("action", "⚔️  Action & Epic"),
-            ft.dropdown.Option("suspense", "🕵️  Suspense"),
-            ft.dropdown.Option("epique", "🏰  Majestic"),
-        ]
-        
-        # Add Custom Profiles to Dropdown
-        for name in config.ETAT.get("custom_profiles", {}):
-            opts.append(ft.dropdown.Option(f"profile_{name}", f"👤 {name}"))
+            # Visual Feedback (Update active button border/color if needed, but for now simple action)
+            # v10.5: Refresh UI to update instrument availability (if creative mode etc)
+            if val == "creatif":
+                 update_ui()
 
-        emotion_selector = ft.Dropdown(
-            options=opts,
-            value=config.ETAT.get("emotion", "aleatoire"),
-            width=250,
-            text_size=12,
-            height=40,
-            bgcolor="#222222", # v10.0 darker background
-            border_color=ft.Colors.with_opacity(0.2, "white"),
-            border_radius=10,
-            color="white"
-        )
-        emotion_selector.on_change = change_emotion
-        # --- PROFILE MANAGEMENT (v10.1) ---
-        
-        # Helper: Custom Overlay Dialog
-        def show_dialog(title, content, actions):
-            def close_dialog(e):
-                main_layout_stack.controls.pop() # Remove last item (the dialog)
-                page.update()
-
-            dialog_container = ft.Container(
-                content=ft.Column([
-                    ft.Text(title, size=16, weight="bold", color="white"),
-                    ft.Container(height=10),
-                    content,
-                    ft.Container(height=20),
-                    ft.Row(actions + [
-                        ft.Container(content=ft.Text("CANCEL", color="#88ffffff"), on_click=close_dialog, padding=10, ink=True)
-                    ], alignment="end")
-                ], width=300, spacing=0),    
-                bgcolor="#222222",
-                border=ft.Border.all(1, "#44ffffff"),
-                border_radius=15,
-                padding=20,
-                shadow=ft.BoxShadow(blur_radius=20, color="black"),
-                alignment=ft.alignment.center
+        def emotion_btn(icon, val, tooltip):
+             return ft.Container(
+                content=ft.Text(icon, size=20),
+                padding=10,
+                bgcolor=ft.Colors.with_opacity(0.1, "white"),
+                border_radius=10,
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                on_click=change_emotion,
+                tooltip=tooltip,
+                ink=True,
+                data=val
             )
-            
-            overlay = ft.Container(
-                content=dialog_container,
-                bgcolor=ft.Colors.with_opacity(0.8, "black"),
-                alignment=ft.alignment.center,
-                expand=True,
-                ink=False # Block clicks through
-            )
-            
-            main_layout_stack.controls.append(overlay)
-            page.update()
 
-        def save_profile_click(e):
-            txt_name = ft.TextField(label="Profile Name", value=f"My Profile {len(config.ETAT.get('custom_profiles', {})) + 1}", border_color="white", color="white")
-            
-            def confirm_save(e):
-                name = txt_name.value.strip()
-                if not name: return
-                
-                # Save Logic
-                profile_data = {
-                    "bpm": config.ETAT.get("bpm", 120),
-                    "actifs": list(config.ETAT.get("instruments_actifs", [])),
-                    "chaos": config.ETAT.get("chaos", 100),
-                    "gravite": config.ETAT.get("gravite", 0)
-                }
-                
-                if "custom_profiles" not in config.ETAT: config.ETAT["custom_profiles"] = {}
-                config.ETAT["custom_profiles"][name] = profile_data
-                
-                # Update Dropdown
-                update_dropdown()
-                
-                print(f"💾 Profil sauvegardé : {name}")
-                main_layout_stack.controls.pop()
-                page.update()
-
-            show_dialog("Save Profile", txt_name, [
-                ft.Container(content=ft.Text("SAVE", color="#4caf50", weight="bold"), on_click=confirm_save, padding=10, ink=True)
-            ])
-
-        def rename_profile_click(e):
-            val = emotion_selector.value
-            if not val or not val.startswith("profile_"): return
-            old_name = val.replace("profile_", "")
-            
-            txt_name = ft.TextField(label="New Name", value=old_name, border_color="white", color="white")
-            
-            def confirm_rename(e):
-                new_name = txt_name.value.strip()
-                if not new_name or new_name == old_name: return
-                
-                # Rename Logic
-                data = config.ETAT["custom_profiles"].pop(old_name)
-                config.ETAT["custom_profiles"][new_name] = data
-                
-                update_dropdown(selected=f"profile_{new_name}")
-                main_layout_stack.controls.pop()
-                page.update()
-
-            show_dialog("Rename Profile", txt_name, [
-                ft.Container(content=ft.Text("RENAME", color="#ff9800", weight="bold"), on_click=confirm_rename, padding=10, ink=True)
-            ])
-            
-        def delete_profile_click(e):
-            val = emotion_selector.value
-            if not val or not val.startswith("profile_"): return
-            name = val.replace("profile_", "")
-            
-            def confirm_delete(e):
-                if name in config.ETAT["custom_profiles"]:
-                    del config.ETAT["custom_profiles"][name]
-                
-                update_dropdown(selected="aleatoire")
-                main_layout_stack.controls.pop()
-                page.update()
-
-            show_dialog("Delete Profile?", ft.Text(f"Are you sure you want to delete '{name}'?", color="#ccffffff"), [
-                ft.Container(content=ft.Text("DELETE", color="#f44336", weight="bold"), on_click=confirm_delete, padding=10, ink=True)
-            ])
-
-        def update_dropdown(selected=None):
-            # Rebuild Options
-            opts = [
-                ft.dropdown.Option("aleatoire", "🎲  Random Flow"),
-                ft.dropdown.Option("joyeux", "☀️  Joy & Light"),
-                ft.dropdown.Option("melancolique", "🌧️  Melancholy"),
-                ft.dropdown.Option("action", "⚔️  Action & Epic"),
-                ft.dropdown.Option("suspense", "🕵️  Suspense"),
-                ft.dropdown.Option("epique", "🏰  Majestic"),
-            ]
-            for name in config.ETAT.get("custom_profiles", {}):
-                opts.append(ft.dropdown.Option(f"profile_{name}", f"👤 {name}"))
-            
-            emotion_selector.options = opts
-            if selected: emotion_selector.value = selected
-            emotion_selector.update()
-            update_manage_buttons()
-
-        def update_manage_buttons():
-            val = emotion_selector.value
-            is_custom = val and val.startswith("profile_")
-            btn_rename.visible = is_custom
-            btn_delete.visible = is_custom
-            btn_rename.update()
-            btn_delete.update()
-
-        def on_dropdown_change(e):
-            change_emotion(e)
-            update_manage_buttons()
-
-        emotion_selector.on_change = on_dropdown_change
-
-        # UI Elements
-        btn_save = ft.Container(content=ft.Text("💾 SAVE", color="#88ffffff", size=10, weight="bold"), on_click=save_profile_click, tooltip="Save New Profile", padding=8, border_radius=10, ink=True, border=ft.Border.all(1, "#33ffffff"))
-        
-        btn_rename = ft.Container(content=ft.Text("✏️", size=12), on_click=rename_profile_click, tooltip="Rename", padding=8, border_radius=10, ink=True, visible=False)
-        btn_delete = ft.Container(content=ft.Text("🗑️", size=12), on_click=delete_profile_click, tooltip="Delete", padding=8, border_radius=10, ink=True, visible=False)
+        row_emotions = ft.Row([
+            emotion_btn("🎲", "aleatoire", "Random Flow"),
+            emotion_btn("🎨", "creatif", "Creative Mode"),
+            emotion_btn("☀️", "joyeux", "Joy"),
+            emotion_btn("🌧️", "melancolique", "Melancholy"),
+            emotion_btn("⚔️", "action", "Action"),
+            emotion_btn("🕵️", "suspense", "Suspense"),
+            emotion_btn("🏰", "epique", "Epic"),
+        ], alignment="center", spacing=10)
 
         return ft.Column([
             ft.Text("ORCHESTRA", size=18, weight="bold", color="white"),
-            ft.Row([emotion_selector, btn_save, btn_rename, btn_delete], alignment="center"),
+            # ft.Row([txt_emotion], alignment="center"), # Removed as requested
             ft.Container(height=5),
             
             # STRINGS SECTIONS
@@ -1019,6 +858,12 @@ def main(page: ft.Page):
                 ("Bells", "bells"), 
                 ("Pizzicato", "pizzicato")
             ]),
+
+            ft.Container(height=10),
+            ft.Divider(color="#22ffffff"),
+            ft.Text("MOOD", size=12, weight="bold", color="#88ffffff"),
+            row_emotions,
+            ft.Container(height=10),
             
         ], horizontal_alignment="center", spacing=15)
 
