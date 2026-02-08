@@ -48,7 +48,12 @@ def main():
         # v10.8: Attempt to increase FluidSynth channels to 48 to support all instruments
         s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT, 
                    audio_driver="fluidsynth", 
-                   fluidsynth_options=["-o", "synth.midi-channels=48"])
+                   fluidsynth_options=[
+                       "-o", "synth.midi-channels=256",  # Massive increase to avoid channel limits
+                       "-o", "synth.polyphony=2048",     # Extreme polyphony for layered pads
+                       "-o", "audio.driver=dsound",      # Better Windows support (optional)
+                       "-o", "synth.gain=0.6"            # Prevent clipping with many voices
+                   ])
     except Exception as e:
         print(f"⚠️ Erreur options FluidSynth, fallback standard: {e}")
         s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT)

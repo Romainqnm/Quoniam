@@ -323,47 +323,43 @@ def main(page: ft.Page):
                     else:
                         container_icone.animate_scale = ft.Animation(int(tempo*900), ft.AnimationCurve.EASE_IN_OUT)
 
-                    # ANIMATION LOGIC
-                    # Pulse
-                    if preset in ["eau", "terre", "printemps", "zen"]:
-                         container_icone.scale = scale_max
-                         container_icone.rotate.angle = 0
+                    # ANIMATION LOGIC (v12.0: Rhythmic Breathing)
+                    current_scale = container_icone.scale
                     
-                    # Spin
+                    # 1. BEAT (Expansion rapide)
+                    if preset in ["eau", "terre", "printemps", "zen", "ete", "feu", "automne", "jungle", "lofi"]:
+                         # Heartbeat effect
+                         container_icone.scale = scale_max
+                         container_icone.animate_scale = ft.Animation(100, ft.AnimationCurve.EASE_OUT) # Quick expand
+                         container_icone.update()
+                         
+                         time.sleep(0.15) # Hold peak slightly
+                         
+                         # 2. DECAY (Relachement lent synchronisé au tempo)
+                         container_icone.scale = 1.0
+                         container_icone.animate_scale = ft.Animation(int(tempo * 800), ft.AnimationCurve.EASE_IN_OUT) # Slow decay
+                         container_icone.update()
+                    
+                    # Special Spin Logic (Space/Cyber)
                     elif preset in ["espace", "vide", "cyber", "indus"]:
-                        angle += 0.5 
+                        angle += 1.0 
                         container_icone.rotate.angle = angle
                         container_icone.scale = 1.0 # No pulse for spin
+                        container_icone.update()
 
-                    # Shake/Vibrate (Simulated by random small rotations/sales)
-                    elif preset in ["feu", "ete"]:
-                        container_icone.rotate.angle = random.uniform(-0.1, 0.1)
-                        container_icone.scale = scale_max * random.uniform(0.95, 1.05)
-                    
-                    else: # Default hybrid
-                        container_icone.scale = scale_max
-                        container_icone.rotate.angle = 0
-
-                    # Aura
-                    container_icone.shadow.spread_radius = 5 + (intensite/10)
-                    container_icone.shadow.color = ft.Colors.with_opacity(0.8, "white")
-                    
+                    # Aura Pulse
+                    container_icone.shadow.spread_radius = 5 + (intensite/8)
+                    container_icone.shadow.color = ft.Colors.with_opacity(0.6, "white")
                     container_icone.update()
-                    time.sleep(tempo)
                     
-                    # REST STATE
-                    container_icone.scale = 1.0
-                    if preset in ["espace", "vide", "cyber", "indus"]:
-                         angle += 0.5
-                         container_icone.rotate.angle = angle
-                    else:
-                         container_icone.rotate.angle = 0
+                    # Wait for next beat (approximate)
+                    sleep_time = max(0.4, tempo - 0.15)
+                    time.sleep(sleep_time)
                     
-                    container_icone.shadow.spread_radius = 0
-                    container_icone.shadow.color = ft.Colors.with_opacity(0.3, "white")
-                    
+                    # Rest of cycle cleanup
+                    container_icone.shadow.spread_radius = 2
+                    container_icone.shadow.color = ft.Colors.with_opacity(0.2, "white")
                     container_icone.update()
-                    time.sleep(tempo)
                 else:
                     time.sleep(1.0)
             except Exception as e:
@@ -499,6 +495,32 @@ def main(page: ft.Page):
     btn_play_container.on_click = toggle_play
 
     # --- NAVIGATION ---
+
+    # ZEN TIMER LOGIC (v12.0)
+    def lancer_zen_timer(minutes):
+        if minutes <= 0: return
+        
+        def timer_thread():
+            print(f"⏳ Zen Timer Started: {minutes} minutes")
+            time.sleep(minutes * 60)
+            
+            # Stop playback
+            if config.ETAT["actif"]:
+                config.ETAT["actif"] = False
+                config.ETAT["timer_minutes"] = 0 # Reset
+                
+                # UI Update Trigger
+                try:
+                    btn_play_content.value = "▶  PLAY"
+                    btn_play_container.gradient.colors = ["#56ab2f", "#a8e063"]
+                    page.update()
+                    
+                    page.snack_bar = ft.SnackBar(ft.Text(f"🧘 Zen Session Finished ({minutes} min)", color="white"), bgcolor="#4caf50")
+                    page.snack_bar.open = True
+                    page.update()
+                except: pass
+                
+        threading.Thread(target=timer_thread, daemon=True).start()
 
     def update_central_icon_for_preset(preset_code):
         if preset_code not in PRESET_THEMES: return
@@ -711,7 +733,8 @@ def main(page: ft.Page):
                     alignment=ft.Alignment(0,0),
                     height=45
                 ),
-                ft.Text(nom, size=10, color=ft.Colors.with_opacity(0.9, "white"), weight="bold")
+                ft.Text(nom, size=10, color="white", weight="bold", 
+                       style=ft.TextStyle(shadow=ft.BoxShadow(blur_radius=3, color=ft.Colors.with_opacity(1.0, "black"), offset=ft.Offset(1, 1))))
             ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
             data=code, 
             on_click=lambda e: [changer_preset(e), update_central_icon_for_preset(code)],
@@ -1066,6 +1089,9 @@ def main(page: ft.Page):
                 if "custom_profiles" not in config.ETAT: config.ETAT["custom_profiles"] = {}
                 config.ETAT["custom_profiles"][name] = profile_data
                 
+                # PERSIST TO DISK (v11.1)
+                config.save_profiles_to_disk()
+                
                 print(f"💾 Profil sauvegardé : {name}")
                 
                 # REFRESH UI
@@ -1204,54 +1230,92 @@ def main(page: ft.Page):
             ft.Container(content=ft.Text("+", color="white", size=20), on_click=lambda e: change_bpm(5), padding=5, border_radius=15, ink=True, bgcolor="#33000000"),
         ], alignment="center")
 
-        def slider_row(label, key, svg_icon, display):
+        def slider_row(label, key, svg_icon, display, tooltip_text=""):
             return ft.Column([
                 ft.Row([
                     get_ui_icon(svg_icon, size=16, color="#88ffffff"),
-                    ft.Text(label, size=12),
+                    ft.Text(label, size=12, tooltip=tooltip_text), # Tooltip on label
                     ft.Container(expand=True),
                     display
                 ]),
                 ft.Slider(min=0 if key!="gravite" else -2, max=100 if key!="gravite" else 2, 
                           divisions=100 if key!="gravite" else 4, 
                           value=config.ETAT[key], on_change=lambda e: changer_valeur(e, key),
-                          active_color="white", inactive_color="#33ffffff", thumb_color="white")
+                          active_color="white", inactive_color="#33ffffff", thumb_color="white",
+                          tooltip=tooltip_text) # Tooltip on slider
             ], spacing=0)
 
         # 2. AUTO MODE BLOCK
         txt_auto = ft.Text("The AI will gently drift parameters over time.", size=10, color="#88ffffff", italic=True)
         
+        # Zen Timer Dropdown
+        def on_timer_change(e):
+             val = e.control.value
+             mins = 0
+             if val == "15 min": mins = 15
+             elif val == "30 min": mins = 30
+             elif val == "60 min": mins = 60
+             
+             if mins > 0:
+                 lancer_zen_timer(mins)
+                 page.snack_bar = ft.SnackBar(ft.Text(f"⏳ Zen Timer set for {mins} minutes", color="white"), bgcolor="#2196f3")
+                 page.snack_bar.open = True
+                 page.update()
+
+        dd_timer = ft.Dropdown(
+            options=[
+                ft.dropdown.Option("Off"),
+                ft.dropdown.Option("15 min"),
+                ft.dropdown.Option("30 min"),
+                ft.dropdown.Option("60 min"),
+            ],
+            width=100,
+            text_size=12,
+            height=35,
+            content_padding=5,
+            border_color="#44ffffff",
+            color="white",
+            value="Off",
+        )
+        dd_timer.on_change = on_timer_change
+
         return ft.Container(
             content=ft.ExpansionTile(
                 title=ft.Row([get_ui_icon(assets.SVG_TUNE, color="white"), ft.Text("Advanced Controls", size=14, color="white")], alignment="center"),
                 controls=[
                     ft.Container(height=10),
                     
-                    # AUTO MODE
-                    creer_bloc("AUTO-DRIFT", assets.SVG_AUTO, [
+                    # ZEN & AUTO MODE
+                    creer_bloc("ZEN MODE & AUTO", assets.SVG_AUTO, [
                         ft.Row([
-                            ft.Text("Enable Auto-Drifting", size=12),
-                            ft.Container(expand=True),
-                            switch_auto
+                            ft.Column([
+                                ft.Text("Auto-Drift", size=11, color="#ddffffff"),
+                                switch_auto
+                            ]),
+                            ft.Container(width=20),
+                            ft.Column([
+                                ft.Text("Sleep Timer", size=11, color="#ddffffff"),
+                                dd_timer
+                            ])
                         ], alignment="center"),
                         txt_auto
-                    ], color="#22ffffff"), # Neutral
+                    ], color="#22ffffff"),
                     
                     ft.Container(height=10),
 
                     # RHYTHM & CHAOS
                     creer_bloc("RHYTHM & FLOW", assets.SVG_WAVES, [
                         row_bpm,
-                        slider_row("Chaos", "chaos", assets.SVG_SHUFFLE, lbl_chaos)
-                    ], color="#224caf50"), # Greenish (Reverted)
+                        slider_row("Chaos", "chaos", assets.SVG_SHUFFLE, lbl_chaos, "Probability of random variations")
+                    ], color="#224caf50"), 
                     
                     ft.Container(height=10),
                     
                     # PHYSICS
                     creer_bloc("ENVIRONMENT", assets.SVG_EARTH, [
-                         slider_row("Intensity", "intensite", assets.SVG_FLASH, lbl_intensite),
-                         slider_row("Gravity", "gravite", assets.SVG_ARROW_DOWN, lbl_gravite),
-                    ], color="#22ff9800"), # Orange (Reverted)
+                         slider_row("Intensity", "intensite", assets.SVG_FLASH, lbl_intensite, "Generic density and volume of the soundscape"),
+                         slider_row("Gravity", "gravite", assets.SVG_ARROW_DOWN, lbl_gravite, "Pitch bias: High (Aer) vs Low (Earth)"),
+                    ], color="#22ff9800"), 
 
                 ],
                 collapsed_text_color="#88ffffff",

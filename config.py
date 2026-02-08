@@ -22,8 +22,37 @@ ETAT = {
     
     # AUTO-DRIFT STATE (v11.0)
     "auto_start_time": 0,       # Timestamp when Auto Mode was enabled
-    "last_inst_update": 0       # Timestamp of last instrument add/remove
+    "last_inst_update": 0,      # Timestamp of last instrument add/remove
+    
+    # ZEN TIMER (v12.0)
+    "timer_minutes": 0          # 0 = Disabled
 }
+
+# --- PERSISTENCE (v11.1) ---
+import json
+import os
+
+PROFILES_FILE = "profiles.json"
+
+def load_profiles():
+    if os.path.exists(PROFILES_FILE):
+        try:
+            with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Error loading profiles: {e}")
+    return {}
+
+def save_profiles_to_disk():
+    try:
+        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            json.dump(ETAT["custom_profiles"], f, indent=4)
+        print(f"💾 Profiles saved to {os.path.abspath(PROFILES_FILE)}")
+    except Exception as e:
+        print(f"❌ Error saving profiles: {e}")
+
+# Initialize with loaded profiles
+ETAT["custom_profiles"] = load_profiles()
 # EMOTION DEFINITIONS (Shared between Logic and UI)
 EMOTIONS = {
     "joyeux": {
