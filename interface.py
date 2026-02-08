@@ -7,6 +7,7 @@ import random
 import base64
 import assets_library as assets
 import os # v13.0 fix
+import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
@@ -112,6 +113,11 @@ def main(page: ft.Page):
             )
         return ft.Container()
 
+    # Helper for SVGs (Moved to Global Scope v13.3)
+    def get_ui_icon(svg_content, color="white", size=18):
+        b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+        return ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=size, height=size, color=color)
+
     # --- VARIABLES ---
     # CONTENEUR ANIMÉ
     # Initial placeholder
@@ -160,13 +166,29 @@ def main(page: ft.Page):
                 left=self.x, top=self.y,
                 opacity=self.opacity,
                 animate_position=ft.Animation(2000, ft.AnimationCurve.LINEAR),
-                animate_opacity=ft.Animation(1000, ft.AnimationCurve.EASE_IN_OUT)
+                animate_opacity=ft.Animation(1000, ft.AnimationCurve.EASE_IN_OUT),
+                animate_scale=ft.Animation(200, ft.AnimationCurve.BOUNCE_OUT) # v13.3: Visualizer pulse
             )
 
         def update(self, theme_mode):
+            # v13.3: Audio-Reactive Visualizer Logic
+            # Pulse size based on audio intensity
+            intensity = config.ETAT.get("intensite", 30)
+            bpm = config.ETAT.get("bpm", 120)
+            
+            # Simple rhythmic pulse
+            pulse = math.sin(time.time() * (bpm / 60.0) * math.pi) 
+            scale_factor = 1.0 + (intensity / 100.0 * 0.5) + (pulse * 0.2)
+            self.container.scale = scale_factor
+            
+            # Speed Factor
+            speed_factor = 1.0 + (intensity / 100.0)
+
             # Update Position
-            self.x += self.vx * 10
-            self.y += self.vy * 10
+            self.x += self.vx * 10 * speed_factor
+            self.y += self.vy * 10 * speed_factor
+            
+            # Wrap around screen
             
             # Wrap around screen
             if self.x > self.page_width: self.x = 0
@@ -237,62 +259,84 @@ def main(page: ft.Page):
             time.sleep(0.1)
 
     # --- GLOBAL AUDIO PLAYER (v13.0 - Pygame Backend) ---
+    # --- GLOBAL AUDIO PLAYER (v13.3 - Dual Channel Crossfade) ---
     class GlobalAudioPlayer:
         def __init__(self):
             try:
                 import pygame
                 pygame.mixer.init()
+                pygame.mixer.set_num_channels(8) # Ensure enough channels
                 self.mixer = pygame.mixer
-                self.music = pygame.mixer.music
+                
+                # Reserve channels 0 and 1 for ambience crossfading
+                self.chan_a = pygame.mixer.Channel(0)
+                self.chan_b = pygame.mixer.Channel(1)
+                
                 self.has_pygame = True
-                print("✅ Pygame Audio System Initialized")
+                print("✅ Pygame Audio System Initialized (Dual Channel Mode)")
             except Exception as e:
                 print(f"❌ Pygame Init Failed: {e}")
                 self.has_pygame = False
 
             self.current_src = None
+            self.active_channel = None # 'A' or 'B' or None
             self.is_muted = False
-            self.volume = 0.4 # v13.2: Lower default volume (40%) to balance with MIDI
+            self.is_paused = False
+            self.volume = 0.4 
             
         def play_ambience(self, preset_key):
-            if not self.has_pygame: 
-                print("❌ Pygame not active, cannot play audio.")
-                return
+            if not self.has_pygame: return
             
             # Resolve file path
             src = config.AUDIO_FILES.get(preset_key)
             print(f"🔊 Playing Audio Request: '{preset_key}' -> Path: '{src}'")
             
-            if not src: 
-                print("⚠️ No audio mapping found for this preset.")
-                return 
-            
-            # Check if file exists
-            if not os.path.exists(src):
+            if not src or not os.path.exists(src):
                 print(f"⚠️ Audio File Missing: {src}")
-                print(f"   (Current CWD: {os.getcwd()})")
                 return
 
-            # Transition
-            if src != self.current_src:
-                print(f"🔄 Switching Track: {self.current_src} -> {src}")
-                try:
-                    self.music.fadeout(1000) # 1s Fade out
-                    self.music.load(src)
-                    self.music.play(loops=-1, fade_ms=1000) # Loop forever, fade in
-                    self.music.set_volume(0 if self.is_muted else self.volume)
-                    self.current_src = src
-                except Exception as e:
-                    print(f"⚠️ Error playing {src}: {e}")
+            if src == self.current_src and not self.is_paused:
+                return # Already playing this track
+
+            # Determine Channels for Crossfade
+            # If nothing playing, start on A.
+            # If A playing, start B and fade A.
+            # If B playing, start A and fade B.
+            
+            target_channel = self.chan_a
+            fade_out_channel = None
+            
+            if self.active_channel == 'A':
+                target_channel = self.chan_b
+                fade_out_channel = self.chan_a
+            elif self.active_channel == 'B':
+                target_channel = self.chan_a
+                fade_out_channel = self.chan_b
+                
+            print(f"🔄 Crossfade: {self.active_channel} -> {'B' if target_channel == self.chan_b else 'A'} (Src: {src})")
+
+            try:
+                sound = self.mixer.Sound(src)
+                target_channel.set_volume(0 if self.is_muted else self.volume)
+                target_channel.play(sound, loops=-1, fade_ms=3000) # 3s Fade In
+                
+                if fade_out_channel:
+                    fade_out_channel.fadeout(3000) # 3s Fade Out
+                    
+                self.current_src = src
+                self.active_channel = 'B' if target_channel == self.chan_b else 'A'
+                self.is_paused = False
+                
+            except Exception as e:
+                print(f"⚠️ Error playing {src}: {e}")
                 
         def toggle_mute(self):
             self.is_muted = not self.is_muted
-            if not self.has_pygame: return self.is_muted
+            target_vol = 0 if self.is_muted else self.volume
             
-            if self.is_muted:
-                self.music.set_volume(0)
-            else:
-                self.music.set_volume(self.volume)
+            if self.has_pygame:
+                self.chan_a.set_volume(target_vol)
+                self.chan_b.set_volume(target_vol)
             return self.is_muted
 
         def set_volume(self, vol_percent):
@@ -301,7 +345,21 @@ def main(page: ft.Page):
             if not self.has_pygame: return
             
             if not self.is_muted:
-                self.music.set_volume(self.volume)
+                self.chan_a.set_volume(self.volume)
+                self.chan_b.set_volume(self.volume)
+
+        def toggle_pause(self):
+            if not self.has_pygame: return
+            
+            if self.is_paused:
+                self.chan_a.unpause()
+                self.chan_b.unpause()
+                self.is_paused = False
+            else:
+                self.chan_a.pause()
+                self.chan_b.pause()
+                self.is_paused = True
+            return self.is_paused
 
     # Val map helper
     def val_map(v, in_min, in_max, out_min, out_max):
@@ -742,19 +800,89 @@ def main(page: ft.Page):
             top_btn("ORCHESTRA", "instruments")
         ], alignment="center", spacing=5)
 
+        # v13.3 Header Controls
+        def pause_click(e):
+            is_paused = global_audio.toggle_pause()
+            # Update Icon
+            btn = e.control.content
+            if isinstance(btn, ft.Container): btn = btn.content # Handle nesting if any
+            if isinstance(btn, ft.Image):
+                 # We need to swap the source base64
+                 # But get_ui_icon returns a new Image. Better to update the container content.
+                 new_icon = get_ui_icon(assets.SVG_PLAY if is_paused else assets.SVG_PAUSE, size=20)
+                 e.control.content = new_icon
+                 e.control.update()
+
+        def mute_click(e):
+            is_muted = global_audio.toggle_mute()
+            # Update Icon
+            # e.control is the Container
+            new_icon = get_ui_icon(assets.SVG_MUTE if is_muted else assets.SVG_VOLUME, 
+                                  color="#ff4444" if is_muted else "white", size=20)
+            e.control.content = new_icon
+            e.control.update()
+
+        def volume_change(e):
+            global_audio.set_volume(e.control.value)
+
+        # Controls
+        ctrl_bar = ft.Row([
+            ft.Container(
+                content=get_ui_icon(assets.SVG_PAUSE, size=20), 
+                on_click=pause_click,
+                tooltip="Pause Ambience",
+                padding=5,
+                border_radius=50,
+                ink=True
+            ),
+            ft.Slider(
+                min=0, max=100, value=40, 
+                width=80, 
+                active_color="white", inactive_color="#44ffffff",
+                on_change=volume_change,
+                tooltip="Ambience Volume"
+            ),
+            ft.Container(
+                content=get_ui_icon(assets.SVG_VOLUME, size=20),
+                on_click=mute_click,
+                tooltip="Mute/Unmute",
+                padding=5,
+                border_radius=50,
+                ink=True
+            )
+        ], spacing=0, alignment="center")
+
         header_nav = ft.Container(
             content=ft.Row([
                 bouton_retour,
                 ft.Container(expand=True),
-                ft.Text("Q U O N I A M", size=18, weight="bold", color="white", font_family="Verdana"), # Stylized Title
+                ft.Row([
+                    ft.Text("LIQUID SOUL", size=18, weight="bold", color="white", font_family="Verdana"),
+                    ft.Text("v13.3", size=10, color="#88ffffff", italic=True)
+                ], spacing=5),
                 ft.Container(expand=True),
+                # We replace the top_bar (navigation) with audio controls here? 
+                # Wait, top_bar was for navigating Collections (Elements, Seasons...)
+                # The user asked for Audio Controls in the Header.
+                # Let's keep top_bar but maybe put Audio Controls ABOVE or NEXT to title?
+                # Actually, the user said "barre de contrôle dans la barre des menus".
+                # Current header has: Back | Title | TopBar (Nav).
+                # Adding Audio Controls might crowd it.
+                # Let's replace the Title with the Controls, or put controls on the right and move Nav below?
+                # Decision: Put Audio Controls to the RIGHT (replacing TopBar? No, TopBar is needed).
+                # Let's put Audio Controls in the CENTER instead of Title, and keep Nav on Right.
+                # Or better: Back | Audio Controls | Nav.
+                
+                ctrl_bar,
+                
+                ft.Container(width=10),
                 top_bar,
-                ft.Container(width=10) 
+                
             ], alignment="center"),
-            bgcolor=ft.Colors.with_opacity(0.4, "black"), # Dark Glass Effect
+            bgcolor=ft.Colors.with_opacity(0.4, "black"),
             border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
             border_radius=20,
-            padding=10,
+            padding=5,
             blur=ft.Blur(10, 10),
             margin=ft.Margin(left=10, top=0, right=10, bottom=0)
         )
@@ -1274,10 +1402,7 @@ def main(page: ft.Page):
         switch_auto.tooltip = "Enable Auto-Drifting"
         switch_auto.on_change = toggle_auto
         
-        # Helper for SVGs (v10.3)
-        def get_ui_icon(svg_content, color="white", size=18):
-            b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
-            return ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=size, height=size, color=color)
+
 
         # v13.2: Re-implemented Value Changer with Audio Volume Link
         def changer_valeur(e, key):
