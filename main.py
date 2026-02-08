@@ -223,19 +223,86 @@ def main():
                     target_data = EMOTIONS.get(target_key, EMOTIONS["joyeux"])
                     
                     # --- INTERPOLATION LOGIC ---
-                    # Only interpolate (drift) parameters if Auto Mode is ON.
-                    # Otherwise, respect the manual sliders completely.
+                    # --- AUTO-DRIFT LOGIC (v11.0) ---
                     if config.ETAT.get("mode_auto", False):
+                        curr_time = time.time()
+                        start_time = config.ETAT.get("auto_start_time", 0)
+                        intro_duration = 12.0 # Slow build up over 12 seconds
+                        
+                        # A. INTRO MODE (Progressive Intensity)
+                        # If we are in the intro phase, we scale the intensity from 0 to Target
+                        if curr_time - start_time < intro_duration:
+                            factor = (curr_time - start_time) / intro_duration
+                            target_i = target_data.get("intensite", 50)
+                            # Apply scaled intensity
+                            config.ETAT["intensite"] = max(10, target_i * factor) 
+                            # Also force BPM to start slower? Maybe not needed.
+                        
+                        # B. PARAMETER DRIFT (Existing but tuned)
                         current_bpm = config.ETAT.get("bpm", 120)
                         target_bpm = target_data.get("bpm", 120)
-                        
                         if abs(current_bpm - target_bpm) > 1:
-                            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.05
+                            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.02 # Slower drift
                             
                         current_i = config.ETAT["intensite"]
                         target_i = target_data.get("intensite", 50)
-                        if abs(current_i - target_i) > 1:
-                            config.ETAT["intensite"] += (target_i - current_i) * 0.05
+                        # Only drift intensity if NOT in intro mode (or if intro finished)
+                        if curr_time - start_time >= intro_duration:
+                            if abs(current_i - target_i) > 1:
+                                config.ETAT["intensite"] += (target_i - current_i) * 0.02
+
+                        # C. DYNAMIC INSTRUMENT MANAGEMENT
+                        # Only check every 4 seconds to avoid chaos
+                        if curr_time - config.ETAT.get("last_inst_update", 0) > 4.0:
+                            config.ETAT["last_inst_update"] = curr_time
+                            
+                            actifs = config.ETAT.get("instruments_actifs", [])
+                            preferred = target_data.get("preferred", [])
+                            
+                            # DECISION: ADD Instrument
+                            # - If very few (<3), High chance
+                            # - If intro (<10s) and < 3, High chance
+                            # - Random drift chance
+                            should_add = False
+                            if len(actifs) < 2: should_add = True
+                            elif len(actifs) < 5 and random.random() < 0.3: should_add = True
+                            elif random.random() < 0.1: should_add = True
+                            
+                            if should_add:
+                                # Pick a preferred one not currently active
+                                candidates = [i for i in preferred if i not in actifs]
+                                # If no preferred candidates, pick any available valid instrument
+                                if not candidates and random.random() < 0.2:
+                                    candidates = [i for i in instruments.keys() if i not in actifs]
+                                
+                                if candidates:
+                                    new_inst = random.choice(candidates)
+                                    actifs.append(new_inst)
+                                    print(f"➕ Auto-Drift: Adding {new_inst}")
+                                    config.ETAT["instruments_actifs"] = actifs
+                                    config.ETAT["ui_needs_update"] = True # Signal UI
+
+                            # DECISION: REMOVE Instrument
+                            # - If too many (>6), High Chance
+                            # - Random drift chance
+                            should_remove = False
+                            if len(actifs) > 8: should_remove = True
+                            elif len(actifs) > 5 and random.random() < 0.2: should_remove = True
+                            elif len(actifs) > 2 and random.random() < 0.05: should_remove = True
+                            
+                            if should_remove:
+                                # Prioritize removing NON-preferred instruments
+                                non_pref = [i for i in actifs if i not in preferred]
+                                if non_pref:
+                                    bye = random.choice(non_pref)
+                                else:
+                                    bye = random.choice(actifs)
+                                
+                                actifs.remove(bye)
+                                print(f"➖ Auto-Drift: Removing {bye}")
+                                config.ETAT["instruments_actifs"] = actifs
+                                config.ETAT["ui_needs_update"] = True # Signal UI
+
                     
                     gamme = target_data["gamme"]
                     

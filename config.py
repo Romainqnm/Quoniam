@@ -18,7 +18,11 @@ ETAT = {
     
     # ORCHESTRA MODE
     "mode_orchestre": False,
-    "instruments_actifs": [] # Liste des instruments actifs (ex: ["piano", "violon"])
+    "instruments_actifs": [], # Liste des instruments actifs (ex: ["piano", "violon"])
+    
+    # AUTO-DRIFT STATE (v11.0)
+    "auto_start_time": 0,       # Timestamp when Auto Mode was enabled
+    "last_inst_update": 0       # Timestamp of last instrument add/remove
 }
 # EMOTION DEFINITIONS (Shared between Logic and UI)
 EMOTIONS = {

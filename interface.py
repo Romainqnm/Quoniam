@@ -367,6 +367,18 @@ def main(page: ft.Page):
             except Exception as e:
                 # Silently ignore page attachment errors during startup/shutdown
                 time.sleep(1.0)
+            
+            # v11.0: UI Sync for Auto-Drift (Check if instruments changed externally)
+            # This allows the background audio engine to add/remove instruments and reflected on UI
+            try:
+                if config.ETAT["mode_auto"] and config.ETAT["collection"] == "instruments":
+                     # Simple check: we could store a hash, but list length comparison + first item check is 'good enough' for now
+                     # Or just call a lightweight update?
+                     # Ideally we need a flag "ui_needs_update" in config
+                     if config.ETAT.get("ui_needs_update", False):
+                         update_ui()
+                         config.ETAT["ui_needs_update"] = False
+            except: pass
 
 
     # --- LOGIQUE UI ---
@@ -417,6 +429,15 @@ def main(page: ft.Page):
     
     def toggle_auto(e):
         config.ETAT["mode_auto"] = e.control.value
+        if config.ETAT["mode_auto"]:
+            # v11.0: Initialize Auto-Drift State for Intro Mode
+            config.ETAT["auto_start_time"] = time.time()
+            config.ETAT["last_inst_update"] = time.time()
+            
+            # Ensure at least one instrument is active to start with (Piano default)
+            if not config.ETAT.get("instruments_actifs"):
+                config.ETAT["instruments_actifs"] = ["piano"]
+                
         update_ui()
         
     def toggle_play(e):
