@@ -75,26 +75,26 @@ def main():
         fond_sonore = get_part("Pad 2 (warm)") 
         
         instruments = {
-            # Elements (TEMPORARILY DISABLED TO FREE MIDI CHANNELS)
-            # "eau": get_part("Marimba"),
-            # "air": get_part("Electric Piano 1"),
-            # "feu": get_part("Acoustic Guitar (nylon)"),
-            # "terre": get_part("Cello"),
-            # "espace": get_part("Pad 7 (halo)"),
+            # Elements (Restored v11.0)
+            "eau": get_part("Marimba"),
+            "air": get_part("Electric Piano 1"),
+            "feu": get_part("Acoustic Guitar (nylon)"),
+            "terre": get_part("Cello"), # Shared with Orchestra
+            "espace": get_part("Pad 7 (halo)"), 
             
             # Saisons
-            # "hiver": get_part("Celesta"),
-            # "printemps": get_part("Kalimba"),
-            # "ete": get_part("Steel Drums"),
-            # "automne": get_part("Shakuhachi"),
-            # "vide": get_part("Pad 3 (polysynth)"),
+            "hiver": get_part("Celesta"), # Shared with Orchestra
+            "printemps": get_part("Kalimba"),
+            "ete": get_part("Steel Drums"),
+            "automne": get_part("Shakuhachi"),
+            "vide": get_part("Pad 3 (polysynth)"),
             
             # Atmos
-            # "zen": get_part("Sitar"),
-            # "cyber": get_part("Lead 2 (sawtooth)"),
-            # "lofi": get_part("Electric Piano 2"),
-            # "jungle": get_part("Pan Flute"),
-            # "indus": get_part("Tubular Bells"),
+            "zen": get_part("Sitar"),
+            "cyber": get_part("Lead 2 (sawtooth)"),
+            "lofi": get_part("Electric Piano 2"),
+            "jungle": get_part("Pan Flute"),
+            "indus": get_part("Tubular Bells"), # Shared with Orchestra
             
             # Orchestra Mode (Real Instruments)
             "piano": get_part("Acoustic Grand Piano"),
@@ -197,7 +197,7 @@ def main():
                     EMOTIONS = config.EMOTIONS
                     
                     # DEBUG EMOTION STATE
-                    print(f"🐛 LOOP: emotion={config.ETAT.get('emotion')}, target={config.ETAT.get('target_emotion')}")
+                    # print(f"🐛 LOOP: emotion={config.ETAT.get('emotion')}, target={config.ETAT.get('target_emotion')}")
 
                     current_emotion = config.ETAT.get("emotion", "aleatoire")
                     
@@ -278,7 +278,7 @@ def main():
                                 if candidates:
                                     new_inst = random.choice(candidates)
                                     actifs.append(new_inst)
-                                    print(f"➕ Auto-Drift: Adding {new_inst}")
+                                    # print(f"➕ Auto-Drift: Adding {new_inst}")
                                     config.ETAT["instruments_actifs"] = actifs
                                     config.ETAT["ui_needs_update"] = True # Signal UI
 
@@ -299,7 +299,7 @@ def main():
                                     bye = random.choice(actifs)
                                 
                                 actifs.remove(bye)
-                                print(f"➖ Auto-Drift: Removing {bye}")
+                                # print(f"➖ Auto-Drift: Removing {bye}")
                                 config.ETAT["instruments_actifs"] = actifs
                                 config.ETAT["ui_needs_update"] = True # Signal UI
 

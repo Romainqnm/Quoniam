@@ -241,7 +241,9 @@ def main(page: ft.Page):
     lbl_vitesse = ft.Text("50%", size=12)
     lbl_intensite = ft.Text("30%", size=12)
     lbl_gravite = ft.Text("0", size=12)
+    lbl_gravite = ft.Text("0", size=12)
     lbl_chaos = ft.Text("20%", size=12)
+    lbl_bpm = ft.Text("120 BPM", size=14, weight="bold") # v11.0: Global for Auto-Drift Sync
     switch_auto = ft.Switch(value=False, active_color="#00E5FF")
     
     btn_play_content = ft.Text("▶  PLAY", color="white", weight="bold")
@@ -387,7 +389,9 @@ def main(page: ft.Page):
         lbl_vitesse.value = f"{int(config.ETAT['vitesse'])}%"
         lbl_intensite.value = f"{int(config.ETAT['intensite'])}%"
         lbl_gravite.value = f"{int(config.ETAT['gravite'])}"
+        lbl_gravite.value = f"{int(config.ETAT['gravite'])}"
         lbl_chaos.value = f"{int(config.ETAT['chaos'])}%"
+        lbl_bpm.value = f"{int(config.ETAT.get('bpm', 120))} BPM" # v11.0: Auto-Drift Sync
         
         p = config.ETAT["preset"]
         
@@ -407,14 +411,62 @@ def main(page: ft.Page):
             
         switch_auto.value = config.ETAT["mode_auto"]
         
-        # v10.5: Refresh Instrument Grid to show/hide excluded instruments
+        # v10.5 & v11.0: Refresh Instrument Grid to show/hide excluded instruments
         if config.ETAT["collection"] == "instruments":
-             # Re-generate buttons to apply new dimming/exclusion logic
+             # OPTIMIZED REFRESH: Don't rebuild, just update styles
+             # We assume container_presets.content is the main Column
              try:
-                 new_controls = creer_boutons_instruments()
-                 container_presets.content = new_controls
-                 container_presets.update()
-             except: pass
+                 main_col = container_presets.content
+                 if not main_col or not isinstance(main_col, ft.Column): return
+                 
+                 actifs = config.ETAT.get("instruments_actifs", [])
+                 
+                 # Recursive helper to find and update instrument buttons
+                 def update_recursive(controls):
+                     for c in controls:
+                         # Check if it's an instrument button (Container with data=code)
+                         if isinstance(c, ft.Container) and isinstance(c.data, str) and c.data in instruments_mapping:
+                             inst_code = c.data
+                             is_active = inst_code in actifs
+                             
+                             # Update Style
+                             c.bgcolor = ft.Colors.with_opacity(0.2, "#FFD700") if is_active else ft.Colors.TRANSPARENT
+                             c.border = ft.Border.all(1, "#FFD700") if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.5, "#FFFFFF"))
+                             c.shadow.color = "#FF9800" if is_active else ft.Colors.TRANSPARENT
+                             # Update Icon Color (nested in Column -> Image)
+                             try:
+                                 # Content structure: Column -> [Image, Text]
+                                 if isinstance(c.content, ft.Column):
+                                     img = c.content.controls[0]
+                                     if isinstance(img, ft.Image):
+                                         img.color = "#FFD700" if is_active else "#FFFFFF"
+                             except: pass
+                             
+                             # c.update() # OPTIMIZATION: Don't update individual controls, let page.update() handle it at the end
+                             
+                         # Recurse if control has controls (Row, Column, etc)
+                         elif hasattr(c, "controls") and c.controls:
+                             update_recursive(c.controls)
+                         # Recurse if control is Container with content being a Row/Column
+                         elif isinstance(c, ft.Container) and hasattr(c.content, "controls"):
+                             update_recursive(c.content.controls)
+                 
+                 # Need a reference list of valid instruments to check data against
+                 # We can reconstruct it or import it. For now, let's hardcode the keys or assume any short string data is one?
+                 # Better: re-use the mapping keys from get_asset logic if possible, or just checking if data is not None
+                 # Let's simple check if data is not None and matches our known keys
+                 instruments_mapping = [
+                     "violon", "violoncelle", "contrebasse", "guitare", "basse", "harpe",
+                     "flute", "clarinette", "hautbois", "trompette", "cor", "cuivres",
+                     "piano", "orgue", "timbales", "batterie",
+                     "choir", "voice", "celesta", "bells", "pizzicato"
+                 ]
+                 
+                 update_recursive(main_col.controls)
+                 
+             except Exception as e: 
+                 # print(f"UI Update Error: {e}")
+                 pass
              
         page.update()
 
@@ -635,19 +687,35 @@ def main(page: ft.Page):
 
     # --- HELPERS BOUTONS ---
     
-    def btn_preset(kind, nom, code, c1, c2):
+
+    def btn_preset(icon_key, nom, code, c1, c2):
+        # Resolve SVG
+        mapping = {
+            "earth": assets.SVG_EARTH, "water": assets.SVG_WATER, "fire": assets.SVG_FIRE,
+            "air": assets.SVG_AIR, "space": assets.SVG_SPACE,
+            "winter": assets.SVG_WINTER, "spring": assets.SVG_SPRING, "summer": assets.SVG_SUMMER,
+            "autumn": assets.SVG_AUTUMN, "void": assets.SVG_VOID,
+            "zen": assets.SVG_ZEN, "cyber": assets.SVG_CYBER, "lofi": assets.SVG_LOFI,
+            "jungle": assets.SVG_JUNGLE, "indus": assets.SVG_INDUS
+        }
+        svg_content = mapping.get(icon_key, assets.SVG_NOTE)
+        b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+        
         return ft.Container(
             content=ft.Column([
                 ft.Container(
-                    content=LiquidIcon(kind, c1, c2, scale=0.4),
+                    content=ft.Image(src=f"data:image/svg+xml;base64,{b64}", 
+                                   width=42, height=42, 
+                                   color="white",
+                                   fit="contain"),
                     alignment=ft.Alignment(0,0),
-                    height=25
+                    height=45
                 ),
                 ft.Text(nom, size=10, color=ft.Colors.with_opacity(0.9, "white"), weight="bold")
-            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
             data=code, 
             on_click=lambda e: [changer_preset(e), update_central_icon_for_preset(code)],
-            width=70, height=70,
+            width=70, height=80,
             border_radius=15,
             gradient=ft.LinearGradient(
                 begin=ft.Alignment(-1.0, -1.0),
@@ -665,48 +733,49 @@ def main(page: ft.Page):
                 offset=ft.Offset(0, 5)
             ),
             padding=5,
-            ink=True
+            ink=True,
+            tooltip=nom
         )
 
     def creer_boutons_elements():
         return ft.Column([
             ft.Row([
-                btn_preset("leaf", "Earth", "terre", "#4caf50", "#2e7d32"), 
-                btn_preset("droplet", "Water", "eau", "#00bcd4", "#0288d1"), 
-                btn_preset("droplet", "Fire", "feu", "#ff5722", "#ffeb3b")
+                btn_preset("earth", "Earth", "terre", "#4caf50", "#2e7d32"), 
+                btn_preset("water", "Water", "eau", "#00bcd4", "#0288d1"), 
+                btn_preset("fire", "Fire", "feu", "#ff5722", "#ffeb3b")
             ], alignment="center"),
             ft.Container(height=5),
             ft.Row([
-                btn_preset("orb", "Air", "air", "#b0bec5", "#ffffff"), 
-                btn_preset("orb", "Space", "espace", "#311b92", "#673ab7")
+                btn_preset("air", "Air", "air", "#b0bec5", "#ffffff"), 
+                btn_preset("space", "Space", "espace", "#311b92", "#673ab7")
             ], alignment="center")
         ])
 
     def creer_boutons_saisons():
         return ft.Column([
             ft.Row([
-                btn_preset("orb", "Winter", "hiver", "#81d4fa", "#ffffff"), 
-                btn_preset("leaf", "Spring", "printemps", "#f48fb1", "#c5e1a5"), 
-                btn_preset("orb", "Summer", "ete", "#ff9800", "#ffeb3b")
+                btn_preset("winter", "Winter", "hiver", "#81d4fa", "#ffffff"), 
+                btn_preset("spring", "Spring", "printemps", "#f48fb1", "#c5e1a5"), 
+                btn_preset("summer", "Summer", "ete", "#ff9800", "#ffeb3b")
             ], alignment="center"),
             ft.Container(height=5),
             ft.Row([
-                btn_preset("leaf", "Autumn", "automne", "#a1887f", "#ff7043"), 
-                btn_preset("orb", "Void", "vide", "#000000", "#4a148c")
+                btn_preset("autumn", "Autumn", "automne", "#a1887f", "#ff7043"), 
+                btn_preset("void", "Void", "vide", "#000000", "#4a148c")
             ], alignment="center")
         ])
     
     def creer_boutons_atmos():
         return ft.Column([
             ft.Row([
-                btn_preset("orb", "Zen", "zen", "#81c784", "#c8e6c9"), 
-                btn_preset("orb", "Cyber", "cyber", "#00e676", "#2979ff"), 
-                btn_preset("orb", "LoFi", "lofi", "#d7ccc8", "#795548")
+                btn_preset("zen", "Zen", "zen", "#81c784", "#c8e6c9"), 
+                btn_preset("cyber", "Cyber", "cyber", "#00e676", "#2979ff"), 
+                btn_preset("lofi", "LoFi", "lofi", "#d7ccc8", "#795548")
             ], alignment="center"),
             ft.Container(height=5),
             ft.Row([
-                btn_preset("leaf", "Jungle", "jungle", "#1b5e20", "#4caf50"), 
-                btn_preset("orb", "Indus", "indus", "#607d8b", "#ff5722")
+                btn_preset("jungle", "Jungle", "jungle", "#1b5e20", "#4caf50"), 
+                btn_preset("indus", "Indus", "indus", "#607d8b", "#ff5722")
             ], alignment="center")
         ])
 
@@ -831,11 +900,14 @@ def main(page: ft.Page):
                     base_color = EMOTION_COLORS.get(val, "white")
                 
                 # Apply Styles
+                # Apply Styles
                 try:
                     btn.bgcolor = ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white")
                     btn.border = ft.Border.all(2, base_color) if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.1, "white"))
-                    btn.content.color = base_color if is_active else "#88ffffff"
-                    btn.content.weight = "bold" if is_active else "normal"
+                    # Update Content (Image)
+                    if isinstance(btn.content, ft.Image):
+                        btn.content.color = base_color if is_active else "#88ffffff"
+                    
                     btn.scale = 1.1 if is_active else 1.0
                     btn.update()
                 except RuntimeError:
@@ -868,7 +940,20 @@ def main(page: ft.Page):
             if val == "creatif":
                  update_ui()
 
-        def emotion_btn(icon, val, tooltip):
+        def get_emotion_asset(code):
+            mapping = {
+               "aleatoire": assets.SVG_DICE,
+               "creatif": assets.SVG_PALETTE,
+               "joyeux": assets.SVG_SUN,
+               "melancolique": assets.SVG_RAIN,
+               "action": assets.SVG_SWORD,
+               "suspense": assets.SVG_SUSPENSE,
+               "epique": assets.SVG_EPIC
+            }
+            if code.startswith("profile_"): return assets.SVG_USER
+            return mapping.get(code, assets.SVG_NOTE)
+
+        def emotion_btn(icon_key, val, tooltip):
              # Initial State Calculation
              is_active = config.ETAT.get("emotion") == val
              
@@ -878,10 +963,15 @@ def main(page: ft.Page):
              else:
                  base_color = EMOTION_COLORS.get(val, "white")
              
+             # Prepare SVG
+             svg_content = get_emotion_asset(val)
+             b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+             
              return ft.Container(
-                content=ft.Text(icon, size=16 if val.startswith("profile_") else 20, 
-                               color=base_color if is_active else "#88ffffff", 
-                               weight="bold" if is_active else "normal"),
+                content=ft.Image(src=f"data:image/svg+xml;base64,{b64}", 
+                                width=22, height=22, 
+                                color=base_color if is_active else "#88ffffff",
+                                fit="contain"),
                 padding=10,
                 bgcolor=ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white"),
                 border_radius=10,
@@ -896,13 +986,13 @@ def main(page: ft.Page):
             )
 
         row_emotions = ft.Row([
-            emotion_btn("🎲", "aleatoire", "Random Flow"),
-            emotion_btn("🎨", "creatif", "Creative Mode"),
-            emotion_btn("☀️", "joyeux", "Joy"),
-            emotion_btn("🌧️", "melancolique", "Melancholy"),
-            emotion_btn("⚔️", "action", "Action"),
-            emotion_btn("🕵️", "suspense", "Suspense"),
-            emotion_btn("🏰", "epique", "Epic"),
+            emotion_btn("dice", "aleatoire", "Random Flow"),
+            emotion_btn("palette", "creatif", "Creative Mode"),
+            emotion_btn("sun", "joyeux", "Joy"),
+            emotion_btn("rain", "melancolique", "Melancholy"),
+            emotion_btn("sword", "action", "Action"),
+            emotion_btn("suspense", "suspense", "Suspense"),
+            emotion_btn("castle", "epique", "Epic"),
         ], alignment="center", spacing=10)
         
         # Container for Custom Profiles Buttons
@@ -911,7 +1001,8 @@ def main(page: ft.Page):
         def refresh_profiles_row():
             items = []
             for name in config.ETAT.get("custom_profiles", {}):
-                items.append(emotion_btn(f"👤 {name}", f"profile_{name}", f"Load {name}"))
+                # Use profile name as tooltip, special icon handling inside emotion_btn driven by "profile_" prefix
+                items.append(emotion_btn("user", f"profile_{name}", f"Load {name}"))
             row_custom_profiles.controls = items
             try:
                 if row_custom_profiles.page: row_custom_profiles.update()
@@ -1083,7 +1174,10 @@ def main(page: ft.Page):
             lbl_bpm.value = f"{new_bpm} BPM"
             lbl_bpm.update()
             
-        lbl_bpm = ft.Text(f"{config.ETAT.get('bpm', 120)} BPM", size=14, weight="bold")
+            lbl_bpm.value = f"{new_bpm} BPM"
+            lbl_bpm.update()
+            
+        # lbl_bpm was here, now global
         
         # --- BLOCS DE CONTROLE ---
         def creer_bloc(titre, svg_icon, controls, color="#22ffffff"):
