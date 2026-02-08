@@ -9,7 +9,7 @@ import assets_library as assets
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v8.3"
+    page.title = "QUONIAM v10.0"
     page.theme_mode = "dark"
     page.bgcolor = "#1a1a1a"
     page.window_title_bar_hidden = True
@@ -531,7 +531,7 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Row(controls=liste_cartes, alignment="center", wrap=True, spacing=10),
             ft.Container(expand=True),
-            ft.Text("v8.3 Final Release", size=10, color="#44ffffff")
+            ft.Text("v9.0 Emotional Intelligence", size=10, color="#44ffffff")
         ], horizontal_alignment="center")
 
     def creer_contenu_controle():
@@ -747,9 +747,202 @@ def main(page: ft.Page):
                 ft.Row([btn_inst(n, c) for n, c in instruments_list], alignment="center", wrap=True, spacing=10)
             ], horizontal_alignment="center", spacing=5)
 
+        def change_emotion(e):
+            val = e.control.value
+            
+            # Check if it's a custom profile
+            if val.startswith("profile_"):
+                profile_name = val.replace("profile_", "")
+                if profile_name in config.ETAT.get("custom_profiles", {}):
+                    data = config.ETAT["custom_profiles"][profile_name]
+                    # Load state
+                    config.ETAT["bpm"] = data.get("bpm", 120)
+                    config.ETAT["instruments_actifs"] = data.get("actifs", [])
+                    config.ETAT["chaos"] = data.get("chaos", 100)
+                    config.ETAT["gravite"] = data.get("gravite", 0)
+                    config.ETAT["emotion"] = "custom" # Lock emotion logic to avoid override
+                    print(f"📂 Profil chargé : {profile_name}")
+                    return
+
+            config.ETAT["emotion"] = val
+            config.ETAT["target_emotion"] = val 
+            if val == "aleatoire":
+                 config.ETAT["last_emotion_switch"] = 0 
+        
+        # Build Options List dynamically
+        opts = [
+            ft.dropdown.Option("aleatoire", "🎲  Random Flow"),
+            ft.dropdown.Option("joyeux", "☀️  Joy & Light"),
+            ft.dropdown.Option("melancolique", "🌧️  Melancholy"),
+            ft.dropdown.Option("action", "⚔️  Action & Epic"),
+            ft.dropdown.Option("suspense", "🕵️  Suspense"),
+            ft.dropdown.Option("epique", "🏰  Majestic"),
+        ]
+        
+        # Add Custom Profiles to Dropdown
+        for name in config.ETAT.get("custom_profiles", {}):
+            opts.append(ft.dropdown.Option(f"profile_{name}", f"👤 {name}"))
+
+        emotion_selector = ft.Dropdown(
+            options=opts,
+            value=config.ETAT.get("emotion", "aleatoire"),
+            width=250,
+            text_size=12,
+            height=40,
+            bgcolor="#222222", # v10.0 darker background
+            border_color=ft.Colors.with_opacity(0.2, "white"),
+            border_radius=10,
+            color="white"
+        )
+        emotion_selector.on_change = change_emotion
+        # --- PROFILE MANAGEMENT (v10.1) ---
+        
+        # Helper: Custom Overlay Dialog
+        def show_dialog(title, content, actions):
+            def close_dialog(e):
+                main_layout_stack.controls.pop() # Remove last item (the dialog)
+                page.update()
+
+            dialog_container = ft.Container(
+                content=ft.Column([
+                    ft.Text(title, size=16, weight="bold", color="white"),
+                    ft.Container(height=10),
+                    content,
+                    ft.Container(height=20),
+                    ft.Row(actions + [
+                        ft.Container(content=ft.Text("CANCEL", color="#88ffffff"), on_click=close_dialog, padding=10, ink=True)
+                    ], alignment="end")
+                ], width=300, spacing=0),    
+                bgcolor="#222222",
+                border=ft.Border.all(1, "#44ffffff"),
+                border_radius=15,
+                padding=20,
+                shadow=ft.BoxShadow(blur_radius=20, color="black"),
+                alignment=ft.alignment.center
+            )
+            
+            overlay = ft.Container(
+                content=dialog_container,
+                bgcolor=ft.Colors.with_opacity(0.8, "black"),
+                alignment=ft.alignment.center,
+                expand=True,
+                ink=False # Block clicks through
+            )
+            
+            main_layout_stack.controls.append(overlay)
+            page.update()
+
+        def save_profile_click(e):
+            txt_name = ft.TextField(label="Profile Name", value=f"My Profile {len(config.ETAT.get('custom_profiles', {})) + 1}", border_color="white", color="white")
+            
+            def confirm_save(e):
+                name = txt_name.value.strip()
+                if not name: return
+                
+                # Save Logic
+                profile_data = {
+                    "bpm": config.ETAT.get("bpm", 120),
+                    "actifs": list(config.ETAT.get("instruments_actifs", [])),
+                    "chaos": config.ETAT.get("chaos", 100),
+                    "gravite": config.ETAT.get("gravite", 0)
+                }
+                
+                if "custom_profiles" not in config.ETAT: config.ETAT["custom_profiles"] = {}
+                config.ETAT["custom_profiles"][name] = profile_data
+                
+                # Update Dropdown
+                update_dropdown()
+                
+                print(f"💾 Profil sauvegardé : {name}")
+                main_layout_stack.controls.pop()
+                page.update()
+
+            show_dialog("Save Profile", txt_name, [
+                ft.Container(content=ft.Text("SAVE", color="#4caf50", weight="bold"), on_click=confirm_save, padding=10, ink=True)
+            ])
+
+        def rename_profile_click(e):
+            val = emotion_selector.value
+            if not val or not val.startswith("profile_"): return
+            old_name = val.replace("profile_", "")
+            
+            txt_name = ft.TextField(label="New Name", value=old_name, border_color="white", color="white")
+            
+            def confirm_rename(e):
+                new_name = txt_name.value.strip()
+                if not new_name or new_name == old_name: return
+                
+                # Rename Logic
+                data = config.ETAT["custom_profiles"].pop(old_name)
+                config.ETAT["custom_profiles"][new_name] = data
+                
+                update_dropdown(selected=f"profile_{new_name}")
+                main_layout_stack.controls.pop()
+                page.update()
+
+            show_dialog("Rename Profile", txt_name, [
+                ft.Container(content=ft.Text("RENAME", color="#ff9800", weight="bold"), on_click=confirm_rename, padding=10, ink=True)
+            ])
+            
+        def delete_profile_click(e):
+            val = emotion_selector.value
+            if not val or not val.startswith("profile_"): return
+            name = val.replace("profile_", "")
+            
+            def confirm_delete(e):
+                if name in config.ETAT["custom_profiles"]:
+                    del config.ETAT["custom_profiles"][name]
+                
+                update_dropdown(selected="aleatoire")
+                main_layout_stack.controls.pop()
+                page.update()
+
+            show_dialog("Delete Profile?", ft.Text(f"Are you sure you want to delete '{name}'?", color="#ccffffff"), [
+                ft.Container(content=ft.Text("DELETE", color="#f44336", weight="bold"), on_click=confirm_delete, padding=10, ink=True)
+            ])
+
+        def update_dropdown(selected=None):
+            # Rebuild Options
+            opts = [
+                ft.dropdown.Option("aleatoire", "🎲  Random Flow"),
+                ft.dropdown.Option("joyeux", "☀️  Joy & Light"),
+                ft.dropdown.Option("melancolique", "🌧️  Melancholy"),
+                ft.dropdown.Option("action", "⚔️  Action & Epic"),
+                ft.dropdown.Option("suspense", "🕵️  Suspense"),
+                ft.dropdown.Option("epique", "🏰  Majestic"),
+            ]
+            for name in config.ETAT.get("custom_profiles", {}):
+                opts.append(ft.dropdown.Option(f"profile_{name}", f"👤 {name}"))
+            
+            emotion_selector.options = opts
+            if selected: emotion_selector.value = selected
+            emotion_selector.update()
+            update_manage_buttons()
+
+        def update_manage_buttons():
+            val = emotion_selector.value
+            is_custom = val and val.startswith("profile_")
+            btn_rename.visible = is_custom
+            btn_delete.visible = is_custom
+            btn_rename.update()
+            btn_delete.update()
+
+        def on_dropdown_change(e):
+            change_emotion(e)
+            update_manage_buttons()
+
+        emotion_selector.on_change = on_dropdown_change
+
+        # UI Elements
+        btn_save = ft.Container(content=ft.Text("💾 SAVE", color="#88ffffff", size=10, weight="bold"), on_click=save_profile_click, tooltip="Save New Profile", padding=8, border_radius=10, ink=True, border=ft.Border.all(1, "#33ffffff"))
+        
+        btn_rename = ft.Container(content=ft.Text("✏️", size=12), on_click=rename_profile_click, tooltip="Rename", padding=8, border_radius=10, ink=True, visible=False)
+        btn_delete = ft.Container(content=ft.Text("🗑️", size=12), on_click=delete_profile_click, tooltip="Delete", padding=8, border_radius=10, ink=True, visible=False)
+
         return ft.Column([
             ft.Text("ORCHESTRA", size=18, weight="bold", color="white"),
-            ft.Container(height=10),
+            ft.Row([emotion_selector, btn_save, btn_rename, btn_delete], alignment="center"),
+            ft.Container(height=5),
             
             # STRINGS SECTIONS
             section("STRINGS", [("Violin", "violon"), ("Cello", "violoncelle"), ("Bass", "contrebasse"), ("Harp", "harpe"), ("Guitar", "guitare")]),
@@ -772,14 +965,51 @@ def main(page: ft.Page):
                 ], horizontal_alignment="center")
             ], alignment="center"),
             
-        ], horizontal_alignment="center", spacing=15, scroll=ft.ScrollMode.HIDDEN)
+        ], horizontal_alignment="center", spacing=15)
 
     def creer_panneau_sliders():
+        switch_auto.tooltip = "Enable Auto-Drifting (Emotions change over time)"
         switch_auto.on_change = toggle_auto
-        def slider_row(label, key, emoji, display):
+        
+        # BPM Control Logic
+        def change_bpm(delta):
+            current = config.ETAT.get("bpm", 120)
+            new_bpm = max(40, min(200, current + delta))
+            config.ETAT["bpm"] = new_bpm
+            lbl_bpm.value = f"{new_bpm} BPM"
+            lbl_bpm.update()
+            
+        lbl_bpm = ft.Text(f"{config.ETAT.get('bpm', 120)} BPM", size=14, weight="bold")
+        
+        # --- BLOCS DE CONTROLE ---
+        def creer_bloc(titre, icon_name, controls, color="#1a1a1a"):
+             return ft.Container(
+                 content=ft.Column([
+                     ft.Row([ft.Icon(name=icon_name, size=18, color="white"), ft.Text(titre, size=12, weight="bold", color="#ddffffff")], spacing=10),
+                     ft.Container(height=5),
+                     ft.Column(controls, spacing=10)
+                 ]),
+                 padding=15,
+                 bgcolor=color,
+                 border_radius=15,
+                 border=ft.Border.all(1, "#11ffffff")
+             )
+
+        # 1. RHYTHM BLOCK
+        row_bpm = ft.Row([
+            ft.Text("Tempo", size=12),
+            ft.Container(expand=True),
+            ft.Container(content=ft.Text("-", color="white", size=20), on_click=lambda e: change_bpm(-5), padding=5, border_radius=15, ink=True, bgcolor="#33000000"),
+            ft.Container(width=10),
+            lbl_bpm,
+            ft.Container(width=10),
+            ft.Container(content=ft.Text("+", color="white", size=20), on_click=lambda e: change_bpm(5), padding=5, border_radius=15, ink=True, bgcolor="#33000000"),
+        ], alignment="center")
+
+        def slider_row(label, key, icon_name, display):
             return ft.Column([
                 ft.Row([
-                    ft.Container(content=ft.Text(emoji, size=16), width=30, alignment=ft.Alignment(0,0)),
+                    ft.Icon(name=icon_name, size=16, color="#88ffffff"),
                     ft.Text(label, size=12),
                     ft.Container(expand=True),
                     display
@@ -790,16 +1020,50 @@ def main(page: ft.Page):
                           active_color="white", inactive_color="#33ffffff", thumb_color="white")
             ], spacing=0)
 
+        # 2. AUTO MODE BLOCK (Moved from Header)
+        # Description text for the auto mode
+        txt_auto = ft.Text("The AI will gently drift parameters over time, creating an evolving soundscape.", size=10, color="#88ffffff", italic=True)
+        
         return ft.Container(
-            content=ft.Column([
-                ft.Row([ft.Text("⏰", size=16), ft.Text("Auto Mode", size=12, weight="bold"), ft.Container(expand=True), switch_auto], alignment="center"),
-                ft.Divider(color="#33ffffff"),
-                slider_row("Speed", "vitesse", "🚀", lbl_vitesse),
-                slider_row("Intensity", "intensite", "🌊", lbl_intensite),
-                slider_row("Gravity", "gravite", "⚓", lbl_gravite),
-                slider_row("Chaos", "chaos", "🎲", lbl_chaos),
-            ], spacing=10),
-            padding=15
+            content=ft.ExpansionTile(
+                title=ft.Row([ft.Icon(name="tune", color="white"), ft.Text("Advanced Controls", size=14, color="white")], alignment="center"),
+                controls=[
+                    ft.Container(height=10),
+                    
+                    # AUTO MODE
+                    creer_bloc("AUTO-DRIFT", "autorenew", [
+                        ft.Row([
+                            ft.Text("Enable Auto-Drifting", size=12),
+                            ft.Container(expand=True),
+                            switch_auto
+                        ], alignment="center"),
+                        txt_auto
+                    ], color="#22ffffff"), # Neutral Dark Grey
+                    
+                    ft.Container(height=10),
+
+                    # RHYTHM & CHAOS
+                    creer_bloc("RHYTHM & FLOW", "waves", [
+                        row_bpm,
+                        slider_row("Chaos / Randomness", "chaos", "shuffle", lbl_chaos)
+                    ], color="#22ffffff"), # Neutral Dark Grey
+                    
+                    ft.Container(height=10),
+                    
+                    # PHYSICS
+                    creer_bloc("ENVIRONMENT", "public", [ # 'public' is Earth icon
+                         slider_row("Intensity", "intensite", "flash_on", lbl_intensite),
+                         slider_row("Gravity", "gravite", "arrow_downward", lbl_gravite),
+                    ], color="#22ffffff"), # Neutral Dark Grey
+
+                ],
+                collapsed_text_color="#88ffffff",
+                text_color="white",
+                icon_color="white"
+            ),
+            bgcolor=ft.Colors.with_opacity(0.1, "black"),
+            border_radius=15,
+            padding=5
         )
 
     # Lancement
