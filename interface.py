@@ -58,7 +58,7 @@ def main(page: ft.Page):
                     begin=ft.Alignment(-1,1), end=ft.Alignment(1,-1),
                     colors=[color_start, color_end]
                 ),
-                border_radius=ft.border_radius.only(top_left=0, top_right=size, bottom_left=size, bottom_right=size),
+                border_radius=ft.BorderRadius.only(top_left=0, top_right=size, bottom_left=size, bottom_right=size),
                 rotate=ft.Rotate(0.785), # 45deg
                 shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
             )
@@ -69,7 +69,7 @@ def main(page: ft.Page):
                     begin=ft.Alignment(0,1), end=ft.Alignment(0,-1),
                     colors=[color_start, color_end]
                 ),
-                border_radius=ft.border_radius.only(top_left=size, bottom_right=size, top_right=0, bottom_left=0),
+                border_radius=ft.BorderRadius.only(top_left=size, bottom_right=size, top_right=0, bottom_left=0),
                 shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
             )
         elif kind == "note": # Music Mode - restored Geometric Vinyl
@@ -803,6 +803,7 @@ def main(page: ft.Page):
                     print(f"📂 Profil chargé : {profile_name}")
                     return
 
+            print(f"🖱️ UI: Change Emotion -> {val}")
             config.ETAT["emotion"] = val
             config.ETAT["target_emotion"] = val 
             if val == "aleatoire":

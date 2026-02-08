@@ -36,67 +36,98 @@ def main():
     if os.path.exists(NOM_SOUNDFONT):
         print(f"✅ SoundFont détectée : {NOM_SOUNDFONT}")
         # On force SCAMP à utiliser ce fichier précis
-        s = Session(tempo=120, default_soundfont=NOM_SOUNDFONT)
+        # s = Session(tempo=120, default_soundfont=NOM_SOUNDFONT) # Removed
     else:
         print(f"⚠️ ATTENTION : Fichier {NOM_SOUNDFONT} introuvable !")
         print("   -> Utilisation des sons par défaut (risque de silence).")
         print("   -> Placez le fichier .sf2 dans le même dossier que main.py")
-        s = Session(tempo=120)
+        # s = Session(tempo=120) # Removed
+
+    # v10.0 Rhythmic Base
+    try:
+        # v10.8: Attempt to increase FluidSynth channels to 48 to support all instruments
+        s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT, 
+                   audio_driver="fluidsynth", 
+                   fluidsynth_options=["-o", "synth.midi-channels=48"])
+    except Exception as e:
+        print(f"⚠️ Erreur options FluidSynth, fallback standard: {e}")
+        s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT)
 
     # INSTRUMENTS (Noms standard GM pour FluidR3)
     # FluidR3 reconnait très bien ces noms standards
     try:
-        fond_sonore = s.new_part("Pad 2 (warm)") 
+        # v10.8 OPTIMIZATION: Shared Part Cache to save MIDI channels
+        # SCAMP/FluidSynth is limited to 16 channels per port.
+        # We reuse Parts for identical presets (e.g. Cello used in Earth and Orchestra)
+        parts_cache = {}
+        
+        def get_part(preset_name):
+            if preset_name not in parts_cache:
+                try:
+                    parts_cache[preset_name] = s.new_part(preset_name)
+                    # print(f"🔌 New Part: {preset_name} -> Channel {parts_cache[preset_name].midi_channel}") # Removed attribute access that caused crash
+                    print(f"🔌 New Part: {preset_name}") # Removed attribute access that caused crash
+                except Exception as e:
+                    print(f"⚠️ Failed to create part '{preset_name}': {e}")
+                    return None
+            return parts_cache[preset_name]
+
+        fond_sonore = get_part("Pad 2 (warm)") 
         
         instruments = {
-            # Elements
-            "eau": s.new_part("Marimba"),
-            "air": s.new_part("Electric Piano 1"),
-            "feu": s.new_part("Acoustic Guitar (nylon)"),
-            "terre": s.new_part("Cello"),
-            "espace": s.new_part("Pad 7 (halo)"),
+            # Elements (TEMPORARILY DISABLED TO FREE MIDI CHANNELS)
+            # "eau": get_part("Marimba"),
+            # "air": get_part("Electric Piano 1"),
+            # "feu": get_part("Acoustic Guitar (nylon)"),
+            # "terre": get_part("Cello"),
+            # "espace": get_part("Pad 7 (halo)"),
             
             # Saisons
-            "hiver": s.new_part("Celesta"),
-            "printemps": s.new_part("Kalimba"),
-            "ete": s.new_part("Steel Drums"),
-            "automne": s.new_part("Shakuhachi"),
-            "vide": s.new_part("Pad 3 (polysynth)"),
+            # "hiver": get_part("Celesta"),
+            # "printemps": get_part("Kalimba"),
+            # "ete": get_part("Steel Drums"),
+            # "automne": get_part("Shakuhachi"),
+            # "vide": get_part("Pad 3 (polysynth)"),
             
             # Atmos
-            "zen": s.new_part("Sitar"),
-            "cyber": s.new_part("Lead 2 (sawtooth)"),
-            "lofi": s.new_part("Electric Piano 2"),
-            "jungle": s.new_part("Pan Flute"),
-            "indus": s.new_part("Tubular Bells"),
+            # "zen": get_part("Sitar"),
+            # "cyber": get_part("Lead 2 (sawtooth)"),
+            # "lofi": get_part("Electric Piano 2"),
+            # "jungle": get_part("Pan Flute"),
+            # "indus": get_part("Tubular Bells"),
             
             # Orchestra Mode (Real Instruments)
-            "piano": s.new_part("Acoustic Grand Piano"),
-            "violon": s.new_part("Violin"),
-            "violoncelle": s.new_part("Cello"),
-            "contrebasse": s.new_part("Contrabass"),
-            "flute": s.new_part("Flute"),
-            "clarinette": s.new_part("Clarinet"),
-            "guitare": s.new_part("Acoustic Guitar (steel)"),
-            "basse": s.new_part("Acoustic Bass"),
-            "harpe": s.new_part("Orchestral Harp"),
+            "piano": get_part("Acoustic Grand Piano"),
+            "violon": get_part("Violin"),
+            "violoncelle": get_part("Cello"),           # Shared with 'terre'
+            "contrebasse": get_part("Contrabass"),
+            "flute": get_part("Flute"),
+            "clarinette": get_part("Clarinet"),
+            "guitare": get_part("Acoustic Guitar (steel)"),
+            "basse": get_part("Acoustic Bass"),
+            "harpe": get_part("Orchestral Harp"),
             # NEW INSTRUMENTS (v8.2)
-            "cuivres": s.new_part("Brass Section"),
-            "timbales": s.new_part("Timpani"),
-            "hautbois": s.new_part("Oboe"),
-            "cor": s.new_part("French Horn"),
+            "cuivres": get_part("Brass Section"),
+            "timbales": get_part("Timpani"),
+            "hautbois": get_part("Oboe"),
+            "cor": get_part("French Horn"),
             
             # v8.3 Additions
-            "orgue": s.new_part("Church Organ"),
-            "batterie": s.new_part("Orchestral Kit"), # Often mapped to channel 10 automatically by soundfonts
+            "orgue": get_part("Church Organ"),
+            "batterie": get_part("Orchestral Kit"), 
             
             # v10.6 ETHEREAL & VOICES
-            "choir": s.new_part("Choir Aahs"),
-            "voice": s.new_part("Voice Oohs"),
-            "celesta": s.new_part("Celesta"),
-            "bells": s.new_part("Tubular Bells"),
-            "pizzicato": s.new_part("Pizzicato Strings")
+            "choir": get_part("Choir Aahs"),
+            "voice": get_part("Voice Oohs"),
+            "celesta": get_part("Celesta"),            # Shared with 'hiver'
+            "bells": get_part("Tubular Bells"),        # Shared with 'indus'
+            "pizzicato": get_part("Pizzicato Strings")
         }
+        
+        # Filter out None values (failed parts)
+        instruments = {k: v for k, v in instruments.items() if v is not None}
+        print(f"✅ Loaded {len(parts_cache)} unique parts for {len(instruments)} instruments.")
+
 
         # --- AUDIO EFFECTS (CC Setup) ---
         print("🎛️  Initialisation CC (Reverb/Chorus)...")
@@ -165,6 +196,9 @@ def main():
                     # Using shared definitions from config.py for UI sync
                     EMOTIONS = config.EMOTIONS
                     
+                    # DEBUG EMOTION STATE
+                    print(f"🐛 LOOP: emotion={config.ETAT.get('emotion')}, target={config.ETAT.get('target_emotion')}")
+
                     current_emotion = config.ETAT.get("emotion", "aleatoire")
                     
                     # Random Emotion Logic
