@@ -755,23 +755,58 @@ def main(page: ft.Page):
                 on_click=lambda _: charger_interface_controle(code)
             )
         
+        # v13.4: Hero Card for Orchestra
+        hero_carte = ft.Container(
+            content=ft.Row([
+                ft.Container(
+                    content=LiquidIcon("note", "#FF9800", "#FFD700", scale=1.4), # Larger Icon
+                    padding=10
+                ),
+                ft.Column([
+                    ft.Text("ORCHESTRA", weight="bold", size=22, color="white"),
+                    ft.Text("Compose & Conduct Harmonic Flows", size=12, color=ft.Colors.with_opacity(0.8, "white"))
+                ], alignment="center", spacing=2),
+                ft.Container(expand=True),
+                get_ui_icon(assets.SVG_ARROW_RIGHT, color="white", size=16),
+                ft.Container(width=5)
+            ], alignment="center"),
+            width=320, height=100, # Wide Hero Card
+            border_radius=20,
+            gradient=ft.LinearGradient(
+                begin=ft.Alignment(-1, 0), end=ft.Alignment(1, 0),
+                colors=[ft.Colors.with_opacity(0.8, "#3e2723"), ft.Colors.with_opacity(0.8, "#5d4037")]
+            ),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.4, "#FFD700")), # Gold Border
+            shadow=ft.BoxShadow(blur_radius=20, color="#FF9800", offset=ft.Offset(0, 5)),
+            padding=15,
+            ink=True,
+            on_click=lambda _: charger_interface_controle("instruments")
+        )
+
         # Liste explicite pour éviter tout élément fantôme
-        liste_cartes = [
+        liste_cartes_ambiance = [
             carte("droplet", "ELEMENTS", "Nature & Raw Power", "elements", "cyan", "blue", "cyan"),
             carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
             carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink"),
-            carte("note", "ORCHESTRA", "Create Harmony", "instruments", "#FF9800", "#FFD700", "#8D6E63")
         ]
 
         return ft.Column([
             ft.Container(height=40),
             creer_header(),
             ft.Container(height=40),
-            ft.Text("CHOOSE YOUR WORLD", size=14, weight="bold", color=ft.Colors.with_opacity(0.5, "white")),
-            ft.Container(height=20),
-            ft.Row(controls=liste_cartes, alignment="center", wrap=True, spacing=10),
+            
+            # ORCHESTRA SECTION
+            ft.Text("MAIN STAGE", size=12, weight="bold", color="#88ffffff"),
+            hero_carte,
+            
+            ft.Container(height=30),
+            
+            # AMBIENCE SECTION
+            ft.Text("ATMOSPHERES", size=12, weight="bold", color="#88ffffff"),
+            ft.Row(controls=liste_cartes_ambiance, alignment="center", wrap=True, spacing=10),
+            
             ft.Container(expand=True),
-            ft.Text("v9.0 Emotional Intelligence", size=10, color="#44ffffff")
+            ft.Text("v13.4 Orchestra First", size=10, color="#44ffffff")
         ], horizontal_alignment="center")
 
     def creer_contenu_controle():
