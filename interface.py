@@ -785,31 +785,72 @@ def main(page: ft.Page):
                 ft.Row([btn_inst(n, c) for n, c in instruments_list], alignment="center", wrap=True, spacing=10)
             ], horizontal_alignment="center", spacing=5)
 
+        # v10.9: Emotion Color Mapping
+        EMOTION_COLORS = {
+            "aleatoire": "#CCCCCC",
+            "creatif": "#E91E63", # Pink
+            "joyeux": "#FFD700", # Gold
+            "melancolique": "#2196F3", # Blue
+            "action": "#FF5722", # Deep Orange
+            "suspense": "#9C27B0", # Purple
+            "epique": "#F44336", # Red
+        }
+
         # Handlers for Emotion Buttons
+        def update_emotion_buttons():
+            current = config.ETAT.get("emotion", "aleatoire")
+            for btn in row_emotions.controls:
+                val = btn.data
+                is_active = (current == val)
+                
+                # Determine Color
+                if val.startswith("profile_"):
+                    base_color = "#00BCD4" # Cyan for profiles
+                else:
+                    base_color = EMOTION_COLORS.get(val, "white")
+                
+                # Apply Styles
+                btn.bgcolor = ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white")
+                btn.border = ft.Border.all(2, base_color) if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.1, "white"))
+                btn.content.color = base_color if is_active else "#88ffffff"
+                btn.content.weight = "bold" if is_active else "normal"
+                btn.scale = 1.1 if is_active else 1.0
+                btn.update()
+
         def change_emotion(e):
             val = e.control.data
             print(f"🖱️ UI: Change Emotion -> {val}")
+            
+            # Identify if it is a profile (placeholder for now as profile list is separate)
+            
             config.ETAT["emotion"] = val
             config.ETAT["target_emotion"] = val 
             if val == "aleatoire":
                  config.ETAT["last_emotion_switch"] = 0 
             
-            # Visual Feedback (Update active button border/color if needed, but for now simple action)
-            # v10.5: Refresh UI to update instrument availability (if creative mode etc)
+            update_emotion_buttons()
+            
             if val == "creatif":
                  update_ui()
 
         def emotion_btn(icon, val, tooltip):
+             # Initial State Calculation
+             is_active = config.ETAT.get("emotion") == val
+             base_color = EMOTION_COLORS.get(val, "white")
+             
              return ft.Container(
-                content=ft.Text(icon, size=20),
+                content=ft.Text(icon, size=20, color=base_color if is_active else "#88ffffff", weight="bold" if is_active else "normal"),
                 padding=10,
-                bgcolor=ft.Colors.with_opacity(0.1, "white"),
+                bgcolor=ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white"),
                 border_radius=10,
-                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                border=ft.Border.all(2, base_color) if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.1, "white")),
                 on_click=change_emotion,
                 tooltip=tooltip,
                 ink=True,
-                data=val
+                data=val,
+                animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+                scale=1.1 if is_active else 1.0,
+                animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT)
             )
 
         row_emotions = ft.Row([
@@ -821,6 +862,89 @@ def main(page: ft.Page):
             emotion_btn("🕵️", "suspense", "Suspense"),
             emotion_btn("🏰", "epique", "Epic"),
         ], alignment="center", spacing=10)
+        
+        # --- PROFILE MANAGEMENT (Restored v10.9) ---
+        def show_dialog(title, content, actions):
+            def close_dialog(e):
+                main_layout_stack.controls.pop()
+                page.update()
+
+            dialog_container = ft.Container(
+                content=ft.Column([
+                    ft.Text(title, size=16, weight="bold", color="white"),
+                    ft.Container(height=10),
+                    content,
+                    ft.Container(height=20),
+                    ft.Row(actions + [
+                        ft.Container(content=ft.Text("CANCEL", color="#88ffffff"), on_click=close_dialog, padding=10, ink=True)
+                    ], alignment="end")
+                ], width=300, spacing=0),    
+                bgcolor="#222222",
+                border=ft.Border.all(1, "#44ffffff"),
+                border_radius=15,
+                padding=20,
+                shadow=ft.BoxShadow(blur_radius=20, color="black"),
+                alignment=ft.Alignment(0, 0)
+            )
+            
+            overlay = ft.Container(
+                content=dialog_container,
+                bgcolor=ft.Colors.with_opacity(0.8, "black"),
+                alignment=ft.Alignment(0, 0),
+                expand=True,
+                ink=False
+            )
+            
+            main_layout_stack.controls.append(overlay)
+            page.update()
+
+        def save_profile_click(e):
+            txt_name = ft.TextField(label="Profile Name", value=f"Profile {len(config.ETAT.get('custom_profiles', {})) + 1}", border_color="white", color="white")
+            
+            def confirm_save(e):
+                name = txt_name.value.strip()
+                if not name: return
+                
+                # Save Logic
+                profile_data = {
+                    "bpm": config.ETAT.get("bpm", 120),
+                    "actifs": list(config.ETAT.get("instruments_actifs", [])),
+                    "chaos": config.ETAT.get("chaos", 100),
+                    "gravite": config.ETAT.get("gravite", 0)
+                }
+                
+                if "custom_profiles" not in config.ETAT: config.ETAT["custom_profiles"] = {}
+                config.ETAT["custom_profiles"][name] = profile_data
+                
+                print(f"💾 Profil sauvegardé : {name}")
+                main_layout_stack.controls.pop()
+                page.update()
+                
+                # Feedback
+                btn_save.content.value = "✅ SAVED"
+                btn_save.content.color = "#4caf50"
+                btn_save.update()
+                import time
+                def reset_btn():
+                    time.sleep(2)
+                    btn_save.content.value = "💾 SAVE PROFILE"
+                    btn_save.content.color = "#88ffffff"
+                    btn_save.update()
+                threading.Thread(target=reset_btn, daemon=True).start()
+
+            show_dialog("Save Profile", txt_name, [
+                ft.Container(content=ft.Text("SAVE", color="#4caf50", weight="bold"), on_click=confirm_save, padding=10, ink=True)
+            ])
+
+        btn_save = ft.Container(
+            content=ft.Text("💾 SAVE PROFILE", color="#88ffffff", size=10, weight="bold"), 
+            on_click=save_profile_click, 
+            padding=10, 
+            border_radius=15, 
+            ink=True, 
+            border=ft.Border.all(1, "#22ffffff"),
+            bgcolor=ft.Colors.with_opacity(0.05, "white")
+        )
 
         return ft.Column([
             ft.Text("ORCHESTRA", size=18, weight="bold", color="white"),
@@ -863,6 +987,9 @@ def main(page: ft.Page):
             ft.Divider(color="#22ffffff"),
             ft.Text("MOOD", size=12, weight="bold", color="#88ffffff"),
             row_emotions,
+            
+            ft.Container(height=20), # Spacer before Save
+            btn_save,
             ft.Container(height=10),
             
         ], horizontal_alignment="center", spacing=15)
