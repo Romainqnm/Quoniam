@@ -968,9 +968,14 @@ def main(page: ft.Page):
         ], horizontal_alignment="center", spacing=15)
 
     def creer_panneau_sliders():
-        switch_auto.tooltip = "Enable Auto-Drifting (Emotions change over time)"
+        switch_auto.tooltip = "Enable Auto-Drifting"
         switch_auto.on_change = toggle_auto
         
+        # Helper for SVGs (v10.3)
+        def get_ui_icon(svg_content, color="white", size=18):
+            b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+            return ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=size, height=size, color=color)
+
         # BPM Control Logic
         def change_bpm(delta):
             current = config.ETAT.get("bpm", 120)
@@ -982,17 +987,17 @@ def main(page: ft.Page):
         lbl_bpm = ft.Text(f"{config.ETAT.get('bpm', 120)} BPM", size=14, weight="bold")
         
         # --- BLOCS DE CONTROLE ---
-        def creer_bloc(titre, icon_name, controls, color="#1a1a1a"):
+        def creer_bloc(titre, svg_icon, controls, color="#22ffffff"):
              return ft.Container(
                  content=ft.Column([
-                     ft.Row([ft.Icon(name=icon_name, size=18, color="white"), ft.Text(titre, size=12, weight="bold", color="#ddffffff")], spacing=10),
+                     ft.Row([get_ui_icon(svg_icon), ft.Text(titre, size=12, weight="bold", color="#ddffffff")], spacing=10),
                      ft.Container(height=5),
                      ft.Column(controls, spacing=10)
                  ]),
                  padding=15,
                  bgcolor=color,
                  border_radius=15,
-                 border=ft.Border.all(1, "#11ffffff")
+                 border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white"))
              )
 
         # 1. RHYTHM BLOCK
@@ -1006,10 +1011,10 @@ def main(page: ft.Page):
             ft.Container(content=ft.Text("+", color="white", size=20), on_click=lambda e: change_bpm(5), padding=5, border_radius=15, ink=True, bgcolor="#33000000"),
         ], alignment="center")
 
-        def slider_row(label, key, icon_name, display):
+        def slider_row(label, key, svg_icon, display):
             return ft.Column([
                 ft.Row([
-                    ft.Icon(name=icon_name, size=16, color="#88ffffff"),
+                    get_ui_icon(svg_icon, size=16, color="#88ffffff"),
                     ft.Text(label, size=12),
                     ft.Container(expand=True),
                     display
@@ -1020,46 +1025,46 @@ def main(page: ft.Page):
                           active_color="white", inactive_color="#33ffffff", thumb_color="white")
             ], spacing=0)
 
-        # 2. AUTO MODE BLOCK (Moved from Header)
-        # Description text for the auto mode
-        txt_auto = ft.Text("The AI will gently drift parameters over time, creating an evolving soundscape.", size=10, color="#88ffffff", italic=True)
+        # 2. AUTO MODE BLOCK
+        txt_auto = ft.Text("The AI will gently drift parameters over time.", size=10, color="#88ffffff", italic=True)
         
         return ft.Container(
             content=ft.ExpansionTile(
-                title=ft.Row([ft.Icon(name="tune", color="white"), ft.Text("Advanced Controls", size=14, color="white")], alignment="center"),
+                title=ft.Row([get_ui_icon(assets.SVG_TUNE, color="white"), ft.Text("Advanced Controls", size=14, color="white")], alignment="center"),
                 controls=[
                     ft.Container(height=10),
                     
                     # AUTO MODE
-                    creer_bloc("AUTO-DRIFT", "autorenew", [
+                    creer_bloc("AUTO-DRIFT", assets.SVG_AUTO, [
                         ft.Row([
                             ft.Text("Enable Auto-Drifting", size=12),
                             ft.Container(expand=True),
                             switch_auto
                         ], alignment="center"),
                         txt_auto
-                    ], color="#22ffffff"), # Neutral Dark Grey
+                    ], color="#22ffffff"), # Neutral
                     
                     ft.Container(height=10),
 
                     # RHYTHM & CHAOS
-                    creer_bloc("RHYTHM & FLOW", "waves", [
+                    creer_bloc("RHYTHM & FLOW", assets.SVG_WAVES, [
                         row_bpm,
-                        slider_row("Chaos / Randomness", "chaos", "shuffle", lbl_chaos)
-                    ], color="#22ffffff"), # Neutral Dark Grey
+                        slider_row("Chaos", "chaos", assets.SVG_SHUFFLE, lbl_chaos)
+                    ], color="#224caf50"), # Greenish (Reverted)
                     
                     ft.Container(height=10),
                     
                     # PHYSICS
-                    creer_bloc("ENVIRONMENT", "public", [ # 'public' is Earth icon
-                         slider_row("Intensity", "intensite", "flash_on", lbl_intensite),
-                         slider_row("Gravity", "gravite", "arrow_downward", lbl_gravite),
-                    ], color="#22ffffff"), # Neutral Dark Grey
+                    creer_bloc("ENVIRONMENT", assets.SVG_EARTH, [
+                         slider_row("Intensity", "intensite", assets.SVG_FLASH, lbl_intensite),
+                         slider_row("Gravity", "gravite", assets.SVG_ARROW_DOWN, lbl_gravite),
+                    ], color="#22ff9800"), # Orange (Reverted)
 
                 ],
                 collapsed_text_color="#88ffffff",
                 text_color="white",
-                icon_color="white"
+                icon_color="white",
+                maintain_state=True
             ),
             bgcolor=ft.Colors.with_opacity(0.1, "black"),
             border_radius=15,
