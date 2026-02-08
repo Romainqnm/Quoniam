@@ -45,17 +45,11 @@ def main():
 
     # v10.0 Rhythmic Base
     try:
-        # v10.8: Attempt to increase FluidSynth channels to 48 to support all instruments
-        s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT, 
-                   audio_driver="fluidsynth", 
-                   fluidsynth_options=[
-                       "-o", "synth.midi-channels=256",  # Massive increase to avoid channel limits
-                       "-o", "synth.polyphony=2048",     # Extreme polyphony for layered pads
-                       "-o", "audio.driver=dsound",      # Better Windows support (optional)
-                       "-o", "synth.gain=0.6"            # Prevent clipping with many voices
-                   ])
+        # v13.1 Fix: Standard Session Init to avoid 'fluidsynth_options' error on older SCAMP versions
+        s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT)
+        print("✅ SCAMP Session démarrée (Standard Mode)")
     except Exception as e:
-        print(f"⚠️ Erreur options FluidSynth, fallback standard: {e}")
+        print(f"⚠️ Erreur Session Init: {e}")
         s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT)
 
     # INSTRUMENTS (Noms standard GM pour FluidR3)
@@ -156,6 +150,11 @@ def main():
     def gerer_nappe_fond():
         while True:
             if not config.ETAT["actif"] or config.ETAT["collection"] is None:
+                wait(1.0)
+                continue
+                
+            # v13.0: Skip MIDI Nappe if in Audio Loop Mode
+            if config.ETAT["collection"] in ["elements", "saisons", "atmos"]:
                 wait(1.0)
                 continue
             
@@ -309,9 +308,19 @@ def main():
                                 config.ETAT["ui_needs_update"] = True # Signal UI
 
                     
+                    
                     gamme = target_data["gamme"]
                     
                     # --- PLAYBACK LOGIC ---
+                    # v13.0: Hybrid Engine (MIDI vs Audio Loop)
+                    # If in Elements/Seasons/Atmos, we use Audio Loops (GlobalAudioPlayer)
+                    # So we SKIP MIDI generation here, UNLESS we are in Orchestra mode (or mixed)
+                    current_collection = config.ETAT.get("collection")
+                    if current_collection in ["elements", "saisons", "atmos"]:
+                        # MIDI Silent Mode (Audio Loop is playing in background via interface.py)
+                        wait(1.0)
+                        continue
+
                     bpm = config.ETAT.get("bpm", 120)
                     intensite = config.ETAT["intensite"]
                     chaos = config.ETAT["chaos"]
@@ -400,6 +409,13 @@ def main():
                     continue
 
                 # STANDARD MODE LOGIC
+                # v13.0: Skip standard MIDI generation for Audio Loop Modes (Elements, Seasons, Atmos)
+                # This ensures only the audio file plays, not the MIDI notes.
+                if config.ETAT.get("collection") in ["elements", "saisons", "atmos"]:
+                    wait(1.0)
+                    # Note: We rely on interface.py GlobalAudioPlayer for sound here.
+                    continue
+
                 preset = config.ETAT["preset"]
                 if preset is None: 
                     wait(0.1)

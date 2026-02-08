@@ -6,6 +6,7 @@ import config
 import random
 import base64
 import assets_library as assets
+import os # v13.0 fix
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
@@ -230,13 +231,89 @@ def main(page: ft.Page):
                 p.update(current_theme)
             
             try:
-                page.update()
+                # v13.3 Fix: Update only the layer, not the whole page (Concurrency Crash Fix)
+                particle_layer.update()
             except: pass
             time.sleep(0.1)
+
+    # --- GLOBAL AUDIO PLAYER (v13.0 - Pygame Backend) ---
+    class GlobalAudioPlayer:
+        def __init__(self):
+            try:
+                import pygame
+                pygame.mixer.init()
+                self.mixer = pygame.mixer
+                self.music = pygame.mixer.music
+                self.has_pygame = True
+                print("✅ Pygame Audio System Initialized")
+            except Exception as e:
+                print(f"❌ Pygame Init Failed: {e}")
+                self.has_pygame = False
+
+            self.current_src = None
+            self.is_muted = False
+            self.volume = 0.4 # v13.2: Lower default volume (40%) to balance with MIDI
+            
+        def play_ambience(self, preset_key):
+            if not self.has_pygame: 
+                print("❌ Pygame not active, cannot play audio.")
+                return
+            
+            # Resolve file path
+            src = config.AUDIO_FILES.get(preset_key)
+            print(f"🔊 Playing Audio Request: '{preset_key}' -> Path: '{src}'")
+            
+            if not src: 
+                print("⚠️ No audio mapping found for this preset.")
+                return 
+            
+            # Check if file exists
+            if not os.path.exists(src):
+                print(f"⚠️ Audio File Missing: {src}")
+                print(f"   (Current CWD: {os.getcwd()})")
+                return
+
+            # Transition
+            if src != self.current_src:
+                print(f"🔄 Switching Track: {self.current_src} -> {src}")
+                try:
+                    self.music.fadeout(1000) # 1s Fade out
+                    self.music.load(src)
+                    self.music.play(loops=-1, fade_ms=1000) # Loop forever, fade in
+                    self.music.set_volume(0 if self.is_muted else self.volume)
+                    self.current_src = src
+                except Exception as e:
+                    print(f"⚠️ Error playing {src}: {e}")
+                
+        def toggle_mute(self):
+            self.is_muted = not self.is_muted
+            if not self.has_pygame: return self.is_muted
+            
+            if self.is_muted:
+                self.music.set_volume(0)
+            else:
+                self.music.set_volume(self.volume)
+            return self.is_muted
+
+        def set_volume(self, vol_percent):
+            # vol_percent 0-100 map to 0.0-1.0
+            self.volume = val_map(vol_percent, 0, 100, 0, 1)
+            if not self.has_pygame: return
+            
+            if not self.is_muted:
+                self.music.set_volume(self.volume)
+
+    # Val map helper
+    def val_map(v, in_min, in_max, out_min, out_max):
+        return (v - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+    # INSTANCE GLOBALE (Moved up for scope visibility)
+    global_audio = GlobalAudioPlayer()
 
     threading.Thread(target=animer_fond, daemon=True).start()
 
     # --- UI COMPONENTS ---
+    # ...
     
     lbl_vitesse = ft.Text("50%", size=12)
     lbl_intensite = ft.Text("30%", size=12)
@@ -707,8 +784,18 @@ def main(page: ft.Page):
             ft.Container(height=20),
         ], horizontal_alignment="center", scroll=ft.ScrollMode.HIDDEN)
 
-    # --- HELPERS BOUTONS ---
-    
+
+    def changer_preset(e):
+        val = e.control.data
+        config.ETAT["preset"] = val
+        print(f"🎛️ Logic: Preset changed to {val}")
+        
+        # Trigger Audio
+        try:
+            global_audio.play_ambience(val)
+        except Exception as err:
+            print(f"❌ Error triggering audio: {err}")
+
 
     def btn_preset(icon_key, nom, code, c1, c2):
         # Resolve SVG
@@ -797,8 +884,8 @@ def main(page: ft.Page):
             ], alignment="center"),
             ft.Container(height=5),
             ft.Row([
-                btn_preset("jungle", "Jungle", "jungle", "#1b5e20", "#4caf50"), 
-                btn_preset("indus", "Indus", "indus", "#607d8b", "#ff5722")
+                btn_preset("jungle", "Thunder", "jungle", "#455a64", "#90a4ae"), # Changed colors to Stormy Grey/Blue
+                btn_preset("indus", "Traffic", "indus", "#546e7a", "#cfd8dc")   # Changed colors to Urban Grey
             ], alignment="center")
         ])
 
@@ -1191,6 +1278,25 @@ def main(page: ft.Page):
         def get_ui_icon(svg_content, color="white", size=18):
             b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
             return ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=size, height=size, color=color)
+
+        # v13.2: Re-implemented Value Changer with Audio Volume Link
+        def changer_valeur(e, key):
+            val = e.control.value
+            config.ETAT[key] = val
+            
+            # Update Audio Volume if Intensity changes
+            if key == "intensite":
+                 global_audio.set_volume(val)
+            
+            # Update Labels
+            if key == "vitesse": lbl_vitesse.value = f"{int(val)}%"
+            elif key == "intensite": lbl_intensite.value = f"{int(val)}%"
+            elif key == "chaos": lbl_chaos.value = f"{int(val)}%"
+            elif key == "gravite": lbl_gravite.value = f"{int(val)}"
+            
+            try:
+                page.update()
+            except: pass
 
         # BPM Control Logic
         def change_bpm(delta):

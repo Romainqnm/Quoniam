@@ -22,10 +22,33 @@ ETAT = {
     
     # AUTO-DRIFT STATE (v11.0)
     "auto_start_time": 0,       # Timestamp when Auto Mode was enabled
-    "last_inst_update": 0,      # Timestamp of last instrument add/remove
-    
     # ZEN TIMER (v12.0)
     "timer_minutes": 0          # 0 = Disabled
+}
+
+# --- AUDIO ASSETS (v13.0) ---
+# Placeholder paths - User must add real files to 'assets/sounds/'
+AUDIO_FILES = {
+    # Elements
+    "eau": "assets/sounds/rain.flac",
+    "feu": "assets/sounds/fire.wav",
+    "terre": "assets/sounds/forest.wav",
+    "air": "assets/sounds/wind.flac",
+    "espace": "assets/sounds/drone_space.wav",
+    
+    # Seasons
+    "hiver": "assets/sounds/winter_wind.wav",
+    "printemps": "assets/sounds/birds.wav",
+    "ete": "assets/sounds/crickets.wav",
+    "automne": "assets/sounds/rain_leaves.wav",
+    "vide": "assets/sounds/white_noise.aiff",
+    
+    # Atmos
+    "zen": "assets/sounds/bowl.wav",
+    "cyber": "assets/sounds/glitchwav.wav",
+    "lofi": "assets/sounds/vinyl.mp3",
+    "jungle": "assets/sounds/thunder.wav",
+    "indus": "assets/sounds/traffic.wav"
 }
 
 # --- PERSISTENCE (v11.1) ---
