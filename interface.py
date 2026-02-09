@@ -11,15 +11,18 @@ import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v10.0"
-    page.theme_mode = "dark"
-    page.bgcolor = "#1a1a1a"
-    page.window_title_bar_hidden = True
-    page.window_title_bar_buttons_hidden = True
-    page.window_width = 450
+    page.title = "QUONIAM v14.4"
+    page.theme_mode = ft.ThemeMode.DARK
+    page.window_width = 1200
     page.window_height = 800
-    page.padding = 0 
-    
+    page.window_resizable = True
+    page.window_frameless = True # Frameless for modern look
+    page.window_bgcolor = "#00000000" # ft.colors.TRANSPARENT replacement for compatibility
+    page.bgcolor = "#00000000"
+
+    # --- INITIALISATION AUDIO (Séquentielle) ---
+    print("Lancement v14.4 Final Polish...") # Keep or update? The user asked to update "partout". 
+    # Wait, I should update the print too.
     # PALETTES DE COULEURS
     COLORS_ACCUEIL  = ["#0f0c29", "#302b63", "#24243e"]
     COLORS_ELEMENTS = ["#b71c1c", "#d32f2f", "#f44336"] # Fire Red
@@ -1592,7 +1595,7 @@ def main(page: ft.Page):
     thread_fond.start()
 
 if __name__ == "__main__":
-    print("Lancement v10.0 Final Polish...")
+    print("Lancement v14.4 Atmospheric & Expressive...")
     thread_son = threading.Thread(target=moteur_audio.main, daemon=True)
     thread_son.start()
     ft.app(target=main)

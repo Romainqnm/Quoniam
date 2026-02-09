@@ -1,5 +1,5 @@
-# main.py - MOTEUR AUDIO v10.0 (LIQUID SOUL + SOUNDFONT)
-from scamp import Session, wait, fork
+# main.py - MOTEUR AUDIO v14.4 (LIQUID SOUL + SOUNDFONT)
+from scamp import Session, wait, fork, Envelope
 import random
 import os
 import time
@@ -29,7 +29,7 @@ def humaniser(valeur, taux=0.1):
 # --- MOTEUR ---
 
 def main():
-    print("--- DÉMARRAGE LIQUID SOUL v10.0 ---")
+    print("--- DÉMARRAGE LIQUID SOUL v14.4 ---")
     
     # CHARGEMENT DE LA SOUNDFONT
     # On vérifie si le fichier est là, sinon on avertit
@@ -43,7 +43,7 @@ def main():
         print("   -> Placez le fichier .sf2 dans le même dossier que main.py")
         # s = Session(tempo=120) # Removed
 
-    # v10.0 Rhythmic Base
+    # v14.4 Rhythmic Base
     try:
         # v13.1 Fix: Standard Session Init to avoid 'fluidsynth_options' error on older SCAMP versions
         s = Session(tempo=config.ETAT["bpm"], default_soundfont=NOM_SOUNDFONT)
@@ -243,10 +243,28 @@ def main():
                             # Also force BPM to start slower? Maybe not needed.
                         
                         # B. PARAMETER DRIFT (Existing but tuned)
+                        # v14.3: Wandering Tempo (Micro-Drift)
                         current_bpm = config.ETAT.get("bpm", 120)
-                        target_bpm = target_data.get("bpm", 120)
-                        if abs(current_bpm - target_bpm) > 1:
-                            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.02 # Slower drift
+                        base_target_bpm = target_data.get("bpm", 120)
+                        
+                        # Initialize or update micro-drift target
+                        if "bpm_micro_drift" not in config.ETAT:
+                             config.ETAT["bpm_micro_drift"] = 0
+                             config.ETAT["last_drift_update"] = 0
+                        
+                        # Update drift target every 10-20 seconds
+                        if curr_time - config.ETAT.get("last_drift_update", 0) > random.randint(10, 20):
+                            # New random offset between -10 and +10 BPM
+                            offset = random.randint(-15, 15) # Slightly wider range for more life
+                            config.ETAT["bpm_micro_drift"] = offset
+                            config.ETAT["last_drift_update"] = curr_time
+                            # print(f"🕰️ Tempo Drift: Target is now {base_target_bpm + offset} BPM")
+                        
+                        target_bpm = base_target_bpm + config.ETAT["bpm_micro_drift"]
+                            
+                        # Smoothly drift towards the new wandering target
+                        if abs(current_bpm - target_bpm) > 0.5:
+                            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.05 # Slightly faster reaction to drift
                             
                         current_i = config.ETAT["intensite"]
                         target_i = target_data.get("intensite", 50)
@@ -349,6 +367,18 @@ def main():
                     # Note brute before emotional pitch processing
                     note_courante = note_brute
                     
+                    # v14.1 Smart Polyphony & Cooldowns
+                    # Initialize cooldowns if needed
+                    if not hasattr(config, "COOLDOWNS"): config.COOLDOWNS = {}
+                    if not hasattr(config, "ACTIVE_NOTES"): config.ACTIVE_NOTES = {} # {inst: {note: end_time}}
+                    
+                    # Polyphonic Instruments configuration (Sustain Pedal Allowed)
+                    POLYPHONIC_INSTRUMENTS = ["piano", "harpe", "guitare", "batterie", "celesta", "marimba", "orgue", "timbales"]
+                    
+                    current_time = time.time()
+                    active_count = len(actifs)
+                    density_limit = 8
+
                     # Play all selected instruments (Polyrhythm chance)
                     for inst_name in actifs:
                         if inst_name in instruments:
@@ -362,28 +392,62 @@ def main():
                             if inst_name in target_data.get("preferred", []):
                                 threshold = 0.9 # Higher chance to play
                             
-                            if random.random() < threshold: 
-                                # Voice Throttling for Polyphony Safety
-                                # If many instruments are active, skip some notes to prevent "Ringbuffer full"
-                                density = len(actifs)
-                                if density > 8 and random.random() < 0.3: continue
-                                if density > 12 and random.random() < 0.5: continue
+                            # v14.2 AUTO-DRIFT REFINEMENTS (Intro & Dynamics)
+                            current_intro_factor = 1.0 # Default full active
+                            
+                            if config.ETAT.get("mode_auto", False):
+                                intro_start = config.ETAT.get("auto_start_time", 0)
+                                intro_len = 30.0 # Slow build over 30s (User Request)
+                                if current_time - intro_start < intro_len:
+                                    # Linear ramp 0.1 -> 1.0
+                                    progress = (current_time - intro_start) / intro_len
+                                    current_intro_factor = max(0.1, progress)
+                                    
+                                    # Scale probability (Density Ramp)
+                                    threshold = threshold * current_intro_factor
+                            
+                            # v14.2 DYNAMIC EXPRESSION (Independent Volume Drift)
+                            # Initialize dynamic map if missing
+                            if not hasattr(config, "INST_DYNAMICS"): config.INST_DYNAMICS = {}
+                            
+                            # Drift logic (slow breathing)
+                            current_dyn = config.INST_DYNAMICS.get(inst_name, 1.0)
+                            if random.random() < 0.1: # Update occasionally
+                                drift = random.uniform(-0.05, 0.05)
+                                current_dyn = max(0.4, min(1.3, current_dyn + drift)) # Range 0.4 to 1.3
+                                config.INST_DYNAMICS[inst_name] = current_dyn
+                            
+                            # 1. COOLDOWN CHECK
+                            last_end = config.COOLDOWNS.get(inst_name, 0)
+                            is_polyphonic = inst_name in POLYPHONIC_INSTRUMENTS
+                            
+                            # Monophonic: Strict overlap prevention
+                            if not is_polyphonic:
+                                if current_time < last_end - 0.1: # Allow slight legato (0.1s overlap)
+                                    continue # Skip note, instrument is busy
+                            
+                            # 2. DENSITY CHECK
+                            if active_count > density_limit:
+                                skip_chance = 0.5 if is_polyphonic else 0.8
+                                if random.random() < skip_chance: continue
 
+                            # Intro Density Check override (extra thinning at start)
+                            if current_intro_factor < 0.5 and random.random() > current_intro_factor:
+                                continue
+
+                            if random.random() < threshold: 
                                 inst = instruments[inst_name]
                                 vol = 0.2 + (intensite / 200.0)
                                 vol = humaniser(vol, 0.15) 
                                 
-                                # Dynamic Sustain based on density to prevent polyphony overflow
-                                density = len(actifs)
-                                base_sustain = 2.5
-                                if density > 4: base_sustain = 1.8
-                                if density > 8: base_sustain = 1.2
+                                # Apply Dynamic Expression (Independent Volume)
+                                vol = vol * current_dyn
                                 
-                                if inst_name in ["piano", "harpe", "guitare"]: base_sustain += 1.0
+                                # Apply Intro Volume Ramp
+                                if current_intro_factor < 1.0:
+                                    vol = vol * current_intro_factor
                                 
-                                sustain = base_sustain * random.uniform(0.8, 1.4)
-                                
-                                # v9.1 Logic: Emotion-based Pitch Control
+                                # Pitch Logic
                                 pitch = note_courante + target_data.get("pitch_offset", 0)
                                 
                                 # Default instrument offsets (Bass goes low, Flute goes high)
@@ -401,9 +465,59 @@ def main():
                                 # Percussion Mapping (Drums) - unaffected by pitch logic usually
                                 if inst_name == "batterie":
                                     pitch = random.choice([35, 38, 42, 46]) # Kick, Snare, HiHats
-                                    sustain = 0.5
                                 
-                                inst.play_note(pitch, vol, attente*sustain, blocking=False)
+                                # 4. SUSTAIN PEDAL LOGIC
+                                # Decouple Sound Duration from Rhythm
+                                rhythm_duration = attente
+                                sound_duration = attente
+                                
+                                if is_polyphonic:
+                                    # Sustain Pedal Effect: Note rings longer (User Request v14.4)
+                                    # Multiplier increased to 3.0 - 6.0 for deeper atmosphere
+                                    sound_duration = rhythm_duration * random.uniform(3.0, 6.0)
+                                    # Cooldown is just the rhythm slot (free up immediately for next chord note)
+                                    config.COOLDOWNS[inst_name] = current_time + rhythm_duration
+                                else:
+                                    # Monophonic: Varied Legato / Phrasing (User Request v14.4)
+                                    # Longer notes: 2.5x to 8.0x rhythm duration
+                                    duration_mult = random.uniform(2.5, 8.0) 
+                                    sound_duration = rhythm_duration * duration_mult
+                                    
+                                    # Cooldown matches sound duration to enforce monophony
+                                    config.COOLDOWNS[inst_name] = current_time + (sound_duration * 0.95)
+                                
+                                # Anti-Mud check for Polyphonic: Don't repeat SAME pitch if ringing
+                                active_notes = config.ACTIVE_NOTES.get(inst_name, {})
+                                if pitch in active_notes and active_notes[pitch] > current_time:
+                                     # Note still ringing. 
+                                     if random.random() < 0.8: continue # Skip to avoid phasing
+                                
+                                # Update registry
+                                active_notes[pitch] = current_time + sound_duration
+                                config.ACTIVE_NOTES[inst_name] = active_notes
+                                
+                                # Clean up old notes in registry
+                                config.ACTIVE_NOTES[inst_name] = {k:v for k,v in active_notes.items() if v > current_time}
+                                
+                                # v14.4 ENVELOPE LOGIC (Swell & Fade)
+                                final_vol = vol
+                                if sound_duration > 1.5:
+                                    # Create a dynamic envelope for long notes
+                                    # Soft Attack -> Swell -> Fade Out
+                                    peak_vol = min(1.0, vol * 1.3)
+                                    end_vol = 0.0 if not is_polyphonic else vol * 0.2
+                                    
+                                    # Curve shapes: 2 (convex start), -2 (concave end)
+                                    try:
+                                        final_vol = Envelope.from_levels(
+                                            [vol * 0.1, peak_vol, end_vol], 
+                                            [sound_duration * 0.4, sound_duration * 0.6], 
+                                            curve_shapes=[3, -3] 
+                                        )
+                                    except:
+                                        final_vol = vol # Fallback
+                                
+                                inst.play_note(pitch, final_vol, sound_duration, blocking=False)
                     
                     wait(attente)
                     continue
