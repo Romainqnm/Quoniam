@@ -4,7 +4,6 @@
 > *Built with Python, Flet & SCAMP.*
 
 ![Quoniam Banner](lien_vers_ta_capture_ecran_principale.png)
-*(Note: Upload your best screenshot to the repo and link it here)*
 
 ## 🔮 What is Quoniam?
 Quoniam is not just a music player. It is a **generative audio engine** that creates infinite, non-repetitive soundscapes in real-time. By combining a **Hybrid Audio Architecture** (High-quality natural samples + MIDI procedural generation), it creates the perfect atmosphere for deep work or meditation.
@@ -16,7 +15,7 @@ Quoniam is not just a music player. It is a **generative audio engine** that cre
 * **🎛️ Live Controls:** Adjust "Chaos", "Gravity", and "Tempo" to influence the algorithmic composition in real-time.
 
 ## 🛠️ Tech Stack
-* **Core:** Python 3.10+
+* **Core:** Python 3.11+
 * **GUI:** [Flet](https://flet.dev) (Flutter for Python)
 * **Audio Generation:** [SCAMP](http://scamp.marcevanstein.com/) & FluidSynth
 * **Architecture:** Multithreaded rendering for lag-free UI.
