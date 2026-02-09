@@ -744,18 +744,18 @@ def main(page: ft.Page):
         hero_carte = ft.Container(
             content=ft.Row([
                 ft.Container(
-                    content=LiquidIcon("note", "#FF9800", "#FFD700", scale=1.4), # Larger Icon
+                    content=LiquidIcon("note", "#FF9800", "#FFD700", scale=1.8), # Extra Large Icon
                     padding=10
                 ),
                 ft.Column([
-                    ft.Text("ORCHESTRA", weight="bold", size=22, color="white"),
-                    ft.Text("Compose & Conduct Harmonic Flows", size=12, color=ft.Colors.with_opacity(0.8, "white"))
-                ], alignment="center", spacing=2),
+                    ft.Text("ORCHESTRA", weight="bold", size=24, color="white"), # Larger Title
+                    ft.Text("Compose & Conduct Harmonic Flows", size=12, color=ft.Colors.with_opacity(0.8, "white")) # Slightly smaller text to fit
+                ], alignment="center", spacing=5), # Better spacing
                 ft.Container(expand=True),
-                get_ui_icon(assets.SVG_ARROW_RIGHT, color="white", size=16),
+                get_ui_icon(assets.SVG_ARROW_RIGHT, color="white", size=18),
                 ft.Container(width=5)
-            ], alignment="center"),
-            width=320, height=100, # Wide Hero Card
+            ], alignment="center", vertical_alignment="center"), # Added vertical alignment
+            width=360, height=140, # increased width (340->360)
             border_radius=20,
             gradient=ft.LinearGradient(
                 begin=ft.Alignment(-1, 0), end=ft.Alignment(1, 0),

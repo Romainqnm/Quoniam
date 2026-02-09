@@ -3,7 +3,7 @@
 > **A procedural audio environment for focus, relaxation, and flow.**
 > *Built with Python, Flet & SCAMP.*
 
-![Quoniam Banner](lien_vers_ta_capture_ecran_principale.png)
+![Quoniam Banner](Intro.png)
 
 ## 🔮 What is Quoniam?
 Quoniam is not just a music player. It is a **generative audio engine** that creates infinite, non-repetitive soundscapes in real-time. By combining a **Hybrid Audio Architecture** (High-quality natural samples + MIDI procedural generation), it creates the perfect atmosphere for deep work or meditation.
