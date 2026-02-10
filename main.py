@@ -134,13 +134,14 @@ def main():
             try:
                 # CC 91 = Reverb (General MIDI standard)
                 part.play_note(0, 0, 0) # Wake up channel
-                s.send_message(part, 176, part.midi_channel, 91, 95) # High Reverb (Hall)
-                
-                # CC 93 = Chorus (Ensemble effect)
-                if name in ["violon", "violoncelle", "contrebasse", "cuivres", "cor", "orgue"]:
-                    s.send_message(part, 176, part.midi_channel, 93, 80) # High Chorus for ensemble/organ
-                else:
-                    s.send_message(part, 176, part.midi_channel, 93, 0)
+                if hasattr(part, 'midi_channel') and hasattr(s, 'send_message'):
+                    midi_ch = part.midi_channel
+                    s.send_message(part, 176, midi_ch, 91, 95)  # type: ignore[attr-defined]  # High Reverb (Hall)
+                    # CC 93 = Chorus (Ensemble effect)
+                    if name in ["violon", "violoncelle", "contrebasse", "cuivres", "cor", "orgue"]:
+                        s.send_message(part, 176, midi_ch, 93, 80)  # type: ignore[attr-defined]  # High Chorus
+                    else:
+                        s.send_message(part, 176, midi_ch, 93, 0)  # type: ignore[attr-defined]
             except: pass
     except Exception as e:
         print(f"❌ Erreur chargement instrument : {e}")
@@ -172,7 +173,8 @@ def main():
             
             accord = trouver_accords(note_cible, gamme)
             for n in accord:
-                fond_sonore.play_note(n, vol, duree, blocking=False)
+                if fond_sonore:
+                    fond_sonore.play_note(n, vol, duree, blocking=False)
                 wait(0.1)
             wait(duree * 0.8)
 
@@ -368,9 +370,6 @@ def main():
                     note_courante = note_brute
                     
                     # v14.1 Smart Polyphony & Cooldowns
-                    # Initialize cooldowns if needed
-                    if not hasattr(config, "COOLDOWNS"): config.COOLDOWNS = {}
-                    if not hasattr(config, "ACTIVE_NOTES"): config.ACTIVE_NOTES = {} # {inst: {note: end_time}}
                     
                     # Polyphonic Instruments configuration (Sustain Pedal Allowed)
                     POLYPHONIC_INSTRUMENTS = ["piano", "harpe", "guitare", "batterie", "celesta", "marimba", "orgue", "timbales"]
@@ -407,8 +406,6 @@ def main():
                                     threshold = threshold * current_intro_factor
                             
                             # v14.2 DYNAMIC EXPRESSION (Independent Volume Drift)
-                            # Initialize dynamic map if missing
-                            if not hasattr(config, "INST_DYNAMICS"): config.INST_DYNAMICS = {}
                             
                             # Drift logic (slow breathing)
                             current_dyn = config.INST_DYNAMICS.get(inst_name, 1.0)
@@ -510,9 +507,9 @@ def main():
                                     # Curve shapes: 2 (convex start), -2 (concave end)
                                     try:
                                         final_vol = Envelope.from_levels(
-                                            [vol * 0.1, peak_vol, end_vol], 
-                                            [sound_duration * 0.4, sound_duration * 0.6], 
-                                            curve_shapes=[3, -3] 
+                                            [vol * 0.1, peak_vol, end_vol],
+                                            [sound_duration * 0.4, sound_duration * 0.6],
+                                            curve_shapes=[3, -3]  # type: ignore[call-arg]
                                         )
                                     except:
                                         final_vol = vol # Fallback

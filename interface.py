@@ -1,7 +1,7 @@
 import flet as ft
 import threading
 import time
-import main as moteur_audio
+from audio_engine import QuoniamAudioEngine
 import config
 import random
 import base64
@@ -11,18 +11,17 @@ import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v14.4"
+    page.title = "QUONIAM v15.0"
     page.theme_mode = ft.ThemeMode.DARK
-    page.window_width = 1200
-    page.window_height = 800
-    page.window_resizable = True
-    page.window_frameless = True # Frameless for modern look
-    page.window_bgcolor = "#00000000" # ft.colors.TRANSPARENT replacement for compatibility
+    page.window.width = 1200
+    page.window.height = 800
+    page.window.resizable = True
+    page.window.frameless = True  # Frameless for modern look
+    page.window.bgcolor = "#00000000"
     page.bgcolor = "#00000000"
 
     # --- INITIALISATION AUDIO (Séquentielle) ---
-    print("Lancement v14.4 Final Polish...") # Keep or update? The user asked to update "partout". 
-    # Wait, I should update the print too.
+    print("Lancement v15.0 Nappes Fluides...")
     # PALETTES DE COULEURS
     COLORS_ACCUEIL  = ["#0f0c29", "#302b63", "#24243e"]
     COLORS_ELEMENTS = ["#b71c1c", "#d32f2f", "#f44336"] # Fire Red
@@ -65,7 +64,7 @@ def main(page: ft.Page):
                 ),
                 border_radius=ft.BorderRadius.only(top_left=0, top_right=size, bottom_left=size, bottom_right=size),
                 rotate=ft.Rotate(0.785), # 45deg
-                shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style=ft.BlurStyle.OUTER)
             )
         elif kind == "leaf": # Nature
             return ft.Container(
@@ -75,7 +74,7 @@ def main(page: ft.Page):
                     colors=[color_start, color_end]
                 ),
                 border_radius=ft.BorderRadius.only(top_left=size, bottom_right=size, top_right=0, bottom_left=0),
-                shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                shadow=ft.BoxShadow(blur_radius=10*scale, color=color_start, offset=ft.Offset(0,0), blur_style=ft.BlurStyle.OUTER)
             )
         elif kind == "note": # Music Mode - restored Geometric Vinyl
             offset_y = 0
@@ -102,7 +101,7 @@ def main(page: ft.Page):
                     )
                 ),
                 border=ft.Border.all(2*scale, ft.Colors.with_opacity(0.5, "#FFFFFF")),
-                shadow=ft.BoxShadow(blur_radius=15*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                shadow=ft.BoxShadow(blur_radius=15*scale, color=color_start, offset=ft.Offset(0,0), blur_style=ft.BlurStyle.OUTER)
             )
         elif kind == "orb": # Abstract
             return ft.Container(
@@ -112,7 +111,7 @@ def main(page: ft.Page):
                 ),
                 border_radius=size,
                 border=ft.Border.all(2*scale, ft.Colors.with_opacity(0.5, "white")),
-                shadow=ft.BoxShadow(blur_radius=15*scale, color=color_start, offset=ft.Offset(0,0), blur_style="outer")
+                shadow=ft.BoxShadow(blur_radius=15*scale, color=color_start, offset=ft.Offset(0,0), blur_style=ft.BlurStyle.OUTER)
             )
         return ft.Container()
 
@@ -133,14 +132,16 @@ def main(page: ft.Page):
         blur_radius=20,
         color=ft.Colors.with_opacity(0.5, "cyan"),
         offset=ft.Offset(0, 0),
-        blur_style="outer" 
+        blur_style=ft.BlurStyle.OUTER 
     )
+
+    icone_rotate = ft.Rotate(0, alignment=ft.Alignment(0, 0))
 
     container_icone = ft.Container(
         content=icon_display,
-        alignment=ft.Alignment(0, 0), 
-        scale=1.0, 
-        rotate=ft.Rotate(0, alignment=ft.Alignment(0,0)), 
+        alignment=ft.Alignment(0, 0),
+        scale=1.0,
+        rotate=icone_rotate,
         shadow=glow_shadow,
         border_radius=100, 
         width=100,
@@ -161,7 +162,8 @@ def main(page: ft.Page):
             self.vy = random.uniform(-0.5, 0.5)
             self.opacity = random.uniform(0.1, 0.4)
             self.color = "white"
-            
+            self.rotate = ft.Rotate(0)
+
             self.container = ft.Container(
                 width=self.size, height=self.size,
                 bgcolor=self.color,
@@ -170,7 +172,8 @@ def main(page: ft.Page):
                 opacity=self.opacity,
                 animate_position=ft.Animation(2000, ft.AnimationCurve.LINEAR),
                 animate_opacity=ft.Animation(1000, ft.AnimationCurve.EASE_IN_OUT),
-                animate_scale=ft.Animation(200, ft.AnimationCurve.BOUNCE_OUT) # v13.3: Visualizer pulse
+                animate_scale=ft.Animation(200, ft.AnimationCurve.BOUNCE_OUT), # v13.3: Visualizer pulse
+                rotate=self.rotate
             )
 
         def update(self, theme_mode):
@@ -195,7 +198,7 @@ def main(page: ft.Page):
             elif theme_mode == "saisons": # Falling Petals
                 self.vy = 1.0 * speed_factor + random.uniform(0, 1)
                 self.vx = math.cos(time.time() + self.y) * 1.5 # Sway
-                self.container.rotate.angle += 0.05
+                self.rotate.angle += 0.05
                 
             elif theme_mode == "atmos": # Cyber/Static
                 # Glitch movement
@@ -389,10 +392,10 @@ def main(page: ft.Page):
     lbl_gravite = ft.Text("0", size=12)
     lbl_gravite = ft.Text("0", size=12)
     lbl_chaos = ft.Text("20%", size=12)
-    lbl_bpm = ft.Text("120 BPM", size=14, weight="bold") # v11.0: Global for Auto-Drift Sync
+    lbl_bpm = ft.Text("120 BPM", size=14, weight=ft.FontWeight.BOLD) # v11.0: Global for Auto-Drift Sync
     switch_auto = ft.Switch(value=False, active_color="#00E5FF")
     
-    btn_play_content = ft.Text("▶  PLAY", color="white", weight="bold")
+    btn_play_content = ft.Text("▶  PLAY", color="white", weight=ft.FontWeight.BOLD)
     btn_play_container = ft.Container(
         content=btn_play_content, padding=15, border_radius=30, 
         alignment=ft.Alignment(0, 0), width=200, ink=True,
@@ -403,8 +406,9 @@ def main(page: ft.Page):
     
     # WRAPPER PRINCIPAL (STACK)
     # Layer 0: Gradient Background
+    bg_grad = ft.LinearGradient(begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1), colors=COLORS_ACCUEIL)
     bg_gradient = ft.Container(
-        gradient=ft.LinearGradient(begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1), colors=COLORS_ACCUEIL), 
+        gradient=bg_grad,
         expand=True,
         animate=ft.Animation(2000, ft.AnimationCurve.EASE_OUT_CUBIC)
     )
@@ -415,11 +419,13 @@ def main(page: ft.Page):
     # TITLE BAR REMOVED PER USER REQUEST
     # The application will remain frameless but without custom controls for now.
 
+    content_layer = ft.Container(expand=True)  # Placeholder for content
+
     main_layout_stack = ft.Stack(
         [
             bg_gradient,
             particle_layer,
-            ft.Container(expand=True) # Placeholder for content
+            content_layer
         ],
         expand=True
     )
@@ -428,7 +434,7 @@ def main(page: ft.Page):
     def creer_separateur_neon(couleur="#00E5FF"):
         return ft.Container(
             width=120, height=2, bgcolor="#e0ffffff", border_radius=10,
-            shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color=couleur, blur_style="outer"),
+            shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color=couleur, blur_style=ft.BlurStyle.OUTER),
             margin=ft.Margin(left=0, top=15, right=0, bottom=15)
         )
 
@@ -441,7 +447,7 @@ def main(page: ft.Page):
                 margin=ft.Margin(left=0, top=5, right=0, bottom=0)
             ),
             creer_separateur_neon("#00E5FF")
-        ], horizontal_alignment="center", spacing=0)
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0)
 
     # --- BOUCLE D'ANIMATION ---
     # --- BOUCLE D'ANIMATION ---
@@ -472,13 +478,13 @@ def main(page: ft.Page):
                     container_icone.update()
                     
                     # Aura Pulse (Sync with cycle)
-                    container_icone.shadow.spread_radius = 5 + (intensite/5) * abs(cycle)
-                    container_icone.shadow.color = ft.Colors.with_opacity(0.3 + (abs(cycle)*0.3), "white")
+                    glow_shadow.spread_radius = 5 + (intensite/5) * abs(cycle)
+                    glow_shadow.color = ft.Colors.with_opacity(0.3 + (abs(cycle)*0.3), "white")
                     
                     # Spin for Space Themes
                     if config.ETAT.get("preset") in ["espace", "vide", "cyber", "indus"]:
                         angle += 1.0 
-                        container_icone.rotate.angle = angle
+                        icone_rotate.angle = angle
                     
                     container_icone.update()
                     
@@ -522,10 +528,10 @@ def main(page: ft.Page):
             icon_display.content = new_icon
             
         if config.ETAT["actif"]:
-            btn_play_content.text = "⏸  PAUSE"
+            btn_play_content.value = "⏸  PAUSE"
             btn_play_container.gradient = ft.LinearGradient(colors=["#ff416c", "#ff4b2b"])
         else:
-            btn_play_content.text = "▶  PLAY"
+            btn_play_content.value = "▶  PLAY"
             btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
             
         switch_auto.value = config.ETAT["mode_auto"]
@@ -551,7 +557,7 @@ def main(page: ft.Page):
                              # Update Style
                              c.bgcolor = ft.Colors.with_opacity(0.2, "#FFD700") if is_active else ft.Colors.TRANSPARENT
                              c.border = ft.Border.all(1, "#FFD700") if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.5, "#FFFFFF"))
-                             c.shadow.color = "#FF9800" if is_active else ft.Colors.TRANSPARENT
+                             c.shadow = ft.BoxShadow(blur_radius=10, color="#FF9800" if is_active else ft.Colors.TRANSPARENT)
                              # Update Icon Color (nested in Column -> Image)
                              try:
                                  # Content structure: Column -> [Image, Text]
@@ -564,10 +570,10 @@ def main(page: ft.Page):
                              # c.update() # OPTIMIZATION: Don't update individual controls, let page.update() handle it at the end
                              
                          # Recurse if control has controls (Row, Column, etc)
-                         elif hasattr(c, "controls") and c.controls:
+                         elif isinstance(c, (ft.Row, ft.Column)):
                              update_recursive(c.controls)
                          # Recurse if control is Container with content being a Row/Column
-                         elif isinstance(c, ft.Container) and hasattr(c.content, "controls"):
+                         elif isinstance(c, ft.Container) and isinstance(c.content, (ft.Row, ft.Column)):
                              update_recursive(c.content.controls)
                  
                  # Need a reference list of valid instruments to check data against
@@ -593,11 +599,6 @@ def main(page: ft.Page):
         config.ETAT[cle] = e.control.value
         update_ui()
 
-    def changer_preset(e):
-        config.ETAT["mode_auto"] = False
-        config.ETAT["preset"] = e.control.data
-        update_ui()
-    
     def toggle_auto(e):
         config.ETAT["mode_auto"] = e.control.value
         if config.ETAT["mode_auto"]:
@@ -635,11 +636,11 @@ def main(page: ft.Page):
                 # UI Update Trigger
                 try:
                     btn_play_content.value = "▶  PLAY"
-                    btn_play_container.gradient.colors = ["#56ab2f", "#a8e063"]
+                    btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
                     page.update()
                     
-                    page.snack_bar = ft.SnackBar(ft.Text(f"🧘 Zen Session Finished ({minutes} min)", color="white"), bgcolor="#4caf50")
-                    page.snack_bar.open = True
+                    snack = ft.SnackBar(ft.Text(f"Zen Session Finished ({minutes} min)", color="white"), bgcolor="#4caf50", open=True)
+                    page.overlay.append(snack)
                     page.update()
                 except: pass
                 
@@ -658,15 +659,15 @@ def main(page: ft.Page):
         if nom_collection == "elements":
             config.ETAT["preset"] = "feu" # Changed to Fire as default for Red theme
             presets_controls = creer_boutons_elements()
-            bg_gradient.gradient.colors = COLORS_ELEMENTS
-            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "red") 
+            bg_grad.colors = COLORS_ELEMENTS
+            glow_shadow.color = ft.Colors.with_opacity(0.5, "red") 
             container_icone.content = LiquidIcon("droplet", "#b71c1c", "#f44336", scale=1.0) # Reset to Fire/Droplet
             
         elif nom_collection == "saisons":
             config.ETAT["preset"] = "terre" # Changed to Earth as default for Green theme
             presets_controls = creer_boutons_saisons()
-            bg_gradient.gradient.colors = COLORS_SAISONS
-            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "green") 
+            bg_grad.colors = COLORS_SAISONS
+            glow_shadow.color = ft.Colors.with_opacity(0.5, "green") 
             container_icone.content = LiquidIcon("leaf", "#1b5e20", "#4caf50", scale=1.0) # Reset to Leaf
             
         elif nom_collection == "instruments":
@@ -675,20 +676,20 @@ def main(page: ft.Page):
             if "instruments_actifs" not in config.ETAT: config.ETAT["instruments_actifs"] = []
             
             presets_controls = creer_boutons_instruments()
-            bg_gradient.gradient.colors = ["#3e2723", "#5d4037", "#795548"] # Bronze/Gold theme
-            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "orange") 
+            bg_grad.colors = ["#3e2723", "#5d4037", "#795548"] # Bronze/Gold theme
+            glow_shadow.color = ft.Colors.with_opacity(0.5, "orange") 
             container_icone.content = LiquidIcon("note", "#ff9800", "#ffca28", scale=1.0) # New Note Icon
             
         else:
             config.ETAT["preset"] = "zen"
             presets_controls = creer_boutons_atmos()
-            bg_gradient.gradient.colors = COLORS_ATMOS
-            container_icone.shadow.color = ft.Colors.with_opacity(0.5, "purple") 
+            bg_grad.colors = COLORS_ATMOS
+            glow_shadow.color = ft.Colors.with_opacity(0.5, "purple") 
             container_icone.content = LiquidIcon("orb", "#4a148c", "#9c27b0", scale=1.0) # Reset to Orb 
             
         container_presets.content = presets_controls
         
-        main_layout_stack.controls[2].content = creer_contenu_controle()
+        content_layer.content = creer_contenu_controle()
         page.update()
         
         config.ETAT["actif"] = True 
@@ -699,8 +700,8 @@ def main(page: ft.Page):
         config.ETAT["actif"] = False 
         config.ETAT["mode_orchestre"] = False # Disable Orchestra mode 
         
-        bg_gradient.gradient.colors = COLORS_ACCUEIL
-        main_layout_stack.controls[2].content = creer_contenu_accueil()
+        bg_grad.colors = COLORS_ACCUEIL
+        content_layer.content = creer_contenu_accueil()
         page.update()
         page.update()
 
@@ -717,8 +718,8 @@ def main(page: ft.Page):
                         padding=10,
                         alignment=ft.Alignment(0, 0),
                     ),
-                    ft.Text(titre, weight="bold", size=16, color="white", text_align="center"),
-                    ft.Text(sous_titre, size=11, color=ft.Colors.with_opacity(0.7, "white"), text_align="center")
+                    ft.Text(titre, weight=ft.FontWeight.BOLD, size=16, color="white", text_align=ft.TextAlign.CENTER),
+                    ft.Text(sous_titre, size=11, color=ft.Colors.with_opacity(0.7, "white"), text_align=ft.TextAlign.CENTER)
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
                 width=140, height=220,
                 border_radius=30,
@@ -751,13 +752,13 @@ def main(page: ft.Page):
                     padding=10
                 ),
                 ft.Column([
-                    ft.Text("ORCHESTRA", weight="bold", size=24, color="white"), # Larger Title
+                    ft.Text("ORCHESTRA", weight=ft.FontWeight.BOLD, size=24, color="white"), # Larger Title
                     ft.Text("Compose & Conduct Harmonic Flows", size=12, color=ft.Colors.with_opacity(0.8, "white")) # Slightly smaller text to fit
-                ], alignment="center", spacing=5), # Better spacing
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=5), # Better spacing
                 ft.Container(expand=True),
                 get_ui_icon(assets.SVG_ARROW_RIGHT, color="white", size=18),
                 ft.Container(width=5)
-            ], alignment="center", vertical_alignment="center"), # Added vertical alignment
+            ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER), # Added vertical alignment
             width=360, height=140, # increased width (340->360)
             border_radius=20,
             gradient=ft.LinearGradient(
@@ -772,7 +773,7 @@ def main(page: ft.Page):
         )
 
         # Liste explicite pour éviter tout élément fantôme
-        liste_cartes_ambiance = [
+        liste_cartes_ambiance: list[ft.Control] = [
             carte("droplet", "ELEMENTS", "Nature & Raw Power", "elements", "cyan", "blue", "cyan"),
             carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
             carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink"),
@@ -784,22 +785,22 @@ def main(page: ft.Page):
             ft.Container(height=40),
             
             # ORCHESTRA SECTION
-            ft.Text("MAIN STAGE", size=12, weight="bold", color="#88ffffff"),
+            ft.Text("MAIN STAGE", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
             hero_carte,
             
             ft.Container(height=30),
             
             # AMBIENCE SECTION
-            ft.Text("ATMOSPHERES", size=12, weight="bold", color="#88ffffff"),
-            ft.Row(controls=liste_cartes_ambiance, alignment="center", wrap=True, spacing=10),
-            
+            ft.Text("ATMOSPHERES", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
+            ft.Row(controls=liste_cartes_ambiance, alignment=ft.MainAxisAlignment.CENTER, wrap=True, spacing=10),
+
             ft.Container(expand=True),
-            ft.Text("v13.4 Orchestra First", size=10, color="#44ffffff")
-        ], horizontal_alignment="center")
+            ft.Text("v15.0 Nappes Fluides", size=10, color="#44ffffff")
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def creer_contenu_controle():
         bouton_retour = ft.Container(
-            content=ft.Text("⬅️  BACK", size=12, weight="bold", color="white"),
+            content=ft.Text("⬅️  BACK", size=12, weight=ft.FontWeight.BOLD, color="white"),
             padding=10, border_radius=10, ink=True, on_click=retour_accueil
         )
 
@@ -807,7 +808,7 @@ def main(page: ft.Page):
         def top_btn(text, code):
             is_active = config.ETAT["collection"] == code
             return ft.Container(
-                content=ft.Text(text, size=10, weight="bold", color="white" if is_active else "#88ffffff"),
+                content=ft.Text(text, size=10, weight=ft.FontWeight.BOLD, color="white" if is_active else "#88ffffff"),
                 padding=ft.Padding(left=10, top=5, right=10, bottom=5),
                 border_radius=20,
                 bgcolor="#33ffffff" if is_active else ft.Colors.TRANSPARENT,
@@ -821,7 +822,7 @@ def main(page: ft.Page):
             top_btn("SEASONS", "saisons"),
             top_btn("ATMOS", "atmos"),
             top_btn("ORCHESTRA", "instruments")
-        ], alignment="center", spacing=5)
+        ], alignment=ft.MainAxisAlignment.CENTER, spacing=5)
 
         # v13.3 Header Controls
         def pause_click(e):
@@ -873,15 +874,15 @@ def main(page: ft.Page):
                 border_radius=50,
                 ink=True
             )
-        ], spacing=0, alignment="center")
+        ], spacing=0, alignment=ft.MainAxisAlignment.CENTER)
 
         header_nav = ft.Container(
             content=ft.Row([
                 bouton_retour,
                 ft.Container(expand=True),
                 ft.Row([
-                    ft.Text("LIQUID SOUL", size=18, weight="bold", color="white", font_family="Verdana"),
-                    ft.Text("v13.3", size=10, color="#88ffffff", italic=True)
+                    ft.Text("LIQUID SOUL", size=18, weight=ft.FontWeight.BOLD, color="white", font_family="Verdana"),
+                    ft.Text("v15.0", size=10, color="#88ffffff", italic=True)
                 ], spacing=5),
                 ft.Container(expand=True),
                 # We replace the top_bar (navigation) with audio controls here? 
@@ -901,7 +902,7 @@ def main(page: ft.Page):
                 ft.Container(width=10),
                 top_bar,
                 
-            ], alignment="center"),
+            ], alignment=ft.MainAxisAlignment.CENTER),
             bgcolor=ft.Colors.with_opacity(0.4, "black"),
             border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
             border_radius=20,
@@ -933,19 +934,22 @@ def main(page: ft.Page):
             ft.Container(expand=True),
             btn_play_container,
             ft.Container(height=20),
-        ], horizontal_alignment="center", scroll=ft.ScrollMode.HIDDEN)
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.HIDDEN)
 
 
     def changer_preset(e):
         val = e.control.data
+        config.ETAT["mode_auto"] = False
         config.ETAT["preset"] = val
         print(f"🎛️ Logic: Preset changed to {val}")
-        
+
         # Trigger Audio
         try:
             global_audio.play_ambience(val)
         except Exception as err:
             print(f"❌ Error triggering audio: {err}")
+
+        update_ui()
 
 
     def btn_preset(icon_key, nom, code, c1, c2):
@@ -967,11 +971,11 @@ def main(page: ft.Page):
                     content=ft.Image(src=f"data:image/svg+xml;base64,{b64}", 
                                    width=42, height=42, 
                                    color="white",
-                                   fit="contain"),
+                                   fit=ft.BoxFit.CONTAIN),
                     alignment=ft.Alignment(0,0),
                     height=45
                 ),
-                ft.Text(nom, size=10, color="white", weight="bold", 
+                ft.Text(nom, size=10, color="white", weight=ft.FontWeight.BOLD, 
                        style=ft.TextStyle(shadow=ft.BoxShadow(blur_radius=3, color=ft.Colors.with_opacity(1.0, "black"), offset=ft.Offset(1, 1))))
             ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
             data=code, 
@@ -1004,12 +1008,12 @@ def main(page: ft.Page):
                 btn_preset("earth", "Earth", "terre", "#4caf50", "#2e7d32"), 
                 btn_preset("water", "Water", "eau", "#00bcd4", "#0288d1"), 
                 btn_preset("fire", "Fire", "feu", "#ff5722", "#ffeb3b")
-            ], alignment="center"),
+            ], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=5),
             ft.Row([
                 btn_preset("air", "Air", "air", "#b0bec5", "#ffffff"), 
                 btn_preset("space", "Space", "espace", "#311b92", "#673ab7")
-            ], alignment="center")
+            ], alignment=ft.MainAxisAlignment.CENTER)
         ])
 
     def creer_boutons_saisons():
@@ -1018,12 +1022,12 @@ def main(page: ft.Page):
                 btn_preset("winter", "Winter", "hiver", "#81d4fa", "#ffffff"), 
                 btn_preset("spring", "Spring", "printemps", "#f48fb1", "#c5e1a5"), 
                 btn_preset("summer", "Summer", "ete", "#ff9800", "#ffeb3b")
-            ], alignment="center"),
+            ], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=5),
             ft.Row([
                 btn_preset("autumn", "Autumn", "automne", "#a1887f", "#ff7043"), 
                 btn_preset("void", "Void", "vide", "#000000", "#4a148c")
-            ], alignment="center")
+            ], alignment=ft.MainAxisAlignment.CENTER)
         ])
     
     def creer_boutons_atmos():
@@ -1032,12 +1036,12 @@ def main(page: ft.Page):
                 btn_preset("zen", "Zen", "zen", "#81c784", "#c8e6c9"), 
                 btn_preset("cyber", "Cyber", "cyber", "#00e676", "#2979ff"), 
                 btn_preset("lofi", "LoFi", "lofi", "#d7ccc8", "#795548")
-            ], alignment="center"),
+            ], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=5),
             ft.Row([
                 btn_preset("jungle", "Thunder", "jungle", "#455a64", "#90a4ae"), # Changed colors to Stormy Grey/Blue
                 btn_preset("indus", "Traffic", "indus", "#546e7a", "#cfd8dc")   # Changed colors to Urban Grey
-            ], alignment="center")
+            ], alignment=ft.MainAxisAlignment.CENTER)
         ])
 
     def creer_boutons_instruments():
@@ -1113,8 +1117,8 @@ def main(page: ft.Page):
 
             return ft.Container(
                 content=ft.Column([
-                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=40, height=40, color=icon_color, fit="contain"),
-                    ft.Text(nom, size=10, color="white" if not est_exclu else "#555555", weight="bold", text_align="center", max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
+                    ft.Image(src=f"data:image/svg+xml;base64,{b64}", width=40, height=40, color=icon_color, fit=ft.BoxFit.CONTAIN),
+                    ft.Text(nom, size=10, color="white" if not est_exclu else "#555555", weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
                 data=code,
                 on_click=on_click_action,
@@ -1132,9 +1136,9 @@ def main(page: ft.Page):
 
         def section(titre, instruments_list):
             return ft.Column([
-                ft.Text(titre, size=12, weight="bold", color="#88ffffff"),
-                ft.Row([btn_inst(n, c) for n, c in instruments_list], alignment="center", wrap=True, spacing=10)
-            ], horizontal_alignment="center", spacing=5)
+                ft.Text(titre, size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
+                ft.Row([btn_inst(n, c) for n, c in instruments_list], alignment=ft.MainAxisAlignment.CENTER, wrap=True, spacing=10)
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5)
 
         # v10.9: Emotion Color Mapping
         EMOTION_COLORS = {
@@ -1151,6 +1155,8 @@ def main(page: ft.Page):
         def update_emotion_buttons():
             current = config.ETAT.get("emotion", "aleatoire")
             for btn in row_emotions.controls:
+                if not isinstance(btn, ft.Container):
+                    continue
                 val = btn.data
                 is_active = (current == val)
                 
@@ -1232,7 +1238,7 @@ def main(page: ft.Page):
                 content=ft.Image(src=f"data:image/svg+xml;base64,{b64}", 
                                 width=22, height=22, 
                                 color=base_color if is_active else "#88ffffff",
-                                fit="contain"),
+                                fit=ft.BoxFit.CONTAIN),
                 padding=10,
                 bgcolor=ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white"),
                 border_radius=10,
@@ -1254,10 +1260,10 @@ def main(page: ft.Page):
             emotion_btn("sword", "action", "Action"),
             emotion_btn("suspense", "suspense", "Suspense"),
             emotion_btn("castle", "epique", "Epic"),
-        ], alignment="center", spacing=10)
+        ], alignment=ft.MainAxisAlignment.CENTER, spacing=10)
         
         # Container for Custom Profiles Buttons
-        row_custom_profiles = ft.Row(alignment="center", spacing=10, wrap=True)
+        row_custom_profiles = ft.Row(alignment=ft.MainAxisAlignment.CENTER, spacing=10, wrap=True)
 
         def refresh_profiles_row():
             items = []
@@ -1281,13 +1287,13 @@ def main(page: ft.Page):
 
             dialog_container = ft.Container(
                 content=ft.Column([
-                    ft.Text(title, size=16, weight="bold", color="white"),
+                    ft.Text(title, size=16, weight=ft.FontWeight.BOLD, color="white"),
                     ft.Container(height=10),
                     content,
                     ft.Container(height=20),
                     ft.Row(actions + [
                         ft.Container(content=ft.Text("CANCEL", color="#88ffffff"), on_click=close_dialog, padding=10, ink=True)
-                    ], alignment="end")
+                    ], alignment=ft.MainAxisAlignment.END)
                 ], width=300, spacing=0),    
                 bgcolor="#222222",
                 border=ft.Border.all(1, "#44ffffff"),
@@ -1339,8 +1345,8 @@ def main(page: ft.Page):
                 page.update()
                 
                 # Feedback
-                btn_save.content.value = "✅ SAVED"
-                btn_save.content.color = "#4caf50"
+                btn_save_text.value = "✅ SAVED"
+                btn_save_text.color = "#4caf50"
                 btn_save.update()
                 import time
                 def reset_btn():
@@ -1348,19 +1354,20 @@ def main(page: ft.Page):
                     time.sleep(2)
                     try:
                         if not btn_save.page: return # Safety check
-                        btn_save.content.value = "💾 SAVE PROFILE"
-                        btn_save.content.color = "#88ffffff"
+                        btn_save_text.value = "💾 SAVE PROFILE"
+                        btn_save_text.color = "#88ffffff"
                         btn_save.update()
                     except RuntimeError:
                         pass
                 threading.Thread(target=reset_btn, daemon=True).start()
 
             show_dialog("Save Profile", txt_name, [
-                ft.Container(content=ft.Text("SAVE", color="#4caf50", weight="bold"), on_click=confirm_save, padding=10, ink=True)
+                ft.Container(content=ft.Text("SAVE", color="#4caf50", weight=ft.FontWeight.BOLD), on_click=confirm_save, padding=10, ink=True)
             ])
 
+        btn_save_text = ft.Text("SAVE PROFILE", color="#88ffffff", size=10, weight=ft.FontWeight.BOLD)
         btn_save = ft.Container(
-            content=ft.Text("💾 SAVE PROFILE", color="#88ffffff", size=10, weight="bold"), 
+            content=btn_save_text, 
             on_click=save_profile_click, 
             padding=10, 
             border_radius=15, 
@@ -1370,8 +1377,8 @@ def main(page: ft.Page):
         )
 
         return ft.Column([
-            ft.Text("ORCHESTRA", size=18, weight="bold", color="white"),
-            # ft.Row([txt_emotion], alignment="center"), # Removed as requested
+            ft.Text("ORCHESTRA", size=18, weight=ft.FontWeight.BOLD, color="white"),
+            # ft.Row([txt_emotion], alignment=ft.MainAxisAlignment.CENTER), # Removed as requested
             ft.Container(height=5),
             
             # STRINGS SECTIONS
@@ -1385,15 +1392,15 @@ def main(page: ft.Page):
             # KEYS & PERCUSSION SECTION (Mixed Row)
             ft.Row([
                 ft.Column([
-                    ft.Text("KEYS", size=12, weight="bold", color="#88ffffff"),
+                    ft.Text("KEYS", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
                     ft.Row([btn_inst("Piano", "piano"), btn_inst("Organ", "orgue")], spacing=5)
-                ], horizontal_alignment="center"),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Container(width=10),
                 ft.Column([
-                    ft.Text("PERCUSSION", size=12, weight="bold", color="#88ffffff"),
+                    ft.Text("PERCUSSION", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
                     ft.Row([btn_inst("Timpani", "timbales"), btn_inst("Drums", "batterie")], spacing=5)
-                ], horizontal_alignment="center")
-            ], alignment="center"),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+            ], alignment=ft.MainAxisAlignment.CENTER),
             
             ft.Divider(color="#22ffffff"),
             
@@ -1408,7 +1415,7 @@ def main(page: ft.Page):
 
             ft.Container(height=10),
             ft.Divider(color="#22ffffff"),
-            ft.Text("MOOD", size=12, weight="bold", color="#88ffffff"),
+            ft.Text("MOOD", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
             row_emotions,
             
             ft.Container(height=10),
@@ -1419,7 +1426,7 @@ def main(page: ft.Page):
             btn_save,
             ft.Container(height=10),
             
-        ], horizontal_alignment="center", spacing=15)
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15)
 
     def creer_panneau_sliders():
         switch_auto.tooltip = "Enable Auto-Drifting"
@@ -1463,7 +1470,7 @@ def main(page: ft.Page):
         def creer_bloc(titre, svg_icon, controls, color="#22ffffff"):
              return ft.Container(
                  content=ft.Column([
-                     ft.Row([get_ui_icon(svg_icon), ft.Text(titre, size=12, weight="bold", color="#ddffffff")], spacing=10),
+                     ft.Row([get_ui_icon(svg_icon), ft.Text(titre, size=12, weight=ft.FontWeight.BOLD, color="#ddffffff")], spacing=10),
                      ft.Container(height=5),
                      ft.Column(controls, spacing=10)
                  ]),
@@ -1482,7 +1489,7 @@ def main(page: ft.Page):
             lbl_bpm,
             ft.Container(width=10),
             ft.Container(content=ft.Text("+", color="white", size=20), on_click=lambda e: change_bpm(5), padding=5, border_radius=15, ink=True, bgcolor="#33000000"),
-        ], alignment="center")
+        ], alignment=ft.MainAxisAlignment.CENTER)
 
         def slider_row(label, key, svg_icon, display, tooltip_text=""):
             return ft.Column([
@@ -1512,8 +1519,8 @@ def main(page: ft.Page):
              
              if mins > 0:
                  lancer_zen_timer(mins)
-                 page.snack_bar = ft.SnackBar(ft.Text(f"⏳ Zen Timer set for {mins} minutes", color="white"), bgcolor="#2196f3")
-                 page.snack_bar.open = True
+                 snack = ft.SnackBar(ft.Text(f"Zen Timer set for {mins} minutes", color="white"), bgcolor="#2196f3", open=True)
+                 page.overlay.append(snack)
                  page.update()
 
         dd_timer = ft.Dropdown(
@@ -1531,11 +1538,11 @@ def main(page: ft.Page):
             color="white",
             value="Off",
         )
-        dd_timer.on_change = on_timer_change
+        dd_timer.on_select = on_timer_change
 
         return ft.Container(
             content=ft.ExpansionTile(
-                title=ft.Row([get_ui_icon(assets.SVG_TUNE, color="white"), ft.Text("Advanced Controls", size=14, color="white")], alignment="center"),
+                title=ft.Row([get_ui_icon(assets.SVG_TUNE, color="white"), ft.Text("Advanced Controls", size=14, color="white")], alignment=ft.MainAxisAlignment.CENTER),
                 controls=[
                     ft.Container(height=10),
                     
@@ -1551,7 +1558,7 @@ def main(page: ft.Page):
                                 ft.Text("Sleep Timer", size=11, color="#ddffffff"),
                                 dd_timer
                             ])
-                        ], alignment="center"),
+                        ], alignment=ft.MainAxisAlignment.CENTER),
                         txt_auto
                     ], color="#22ffffff"),
                     
@@ -1583,7 +1590,7 @@ def main(page: ft.Page):
         )
 
     # Lancement
-    main_layout_stack.controls[2].content = creer_contenu_accueil()
+    content_layer.content = creer_contenu_accueil()
     page.add(main_layout_stack)
     
     # Threading correction: Start animation loop AFTER adding content to page
@@ -1595,7 +1602,10 @@ def main(page: ft.Page):
     thread_fond.start()
 
 if __name__ == "__main__":
-    print("Lancement v14.4 Atmospheric & Expressive...")
-    thread_son = threading.Thread(target=moteur_audio.main, daemon=True)
-    thread_son.start()
-    ft.app(target=main)
+    print("Lancement v15.0 Nappes Fluides...")
+
+    # Initialiser et démarrer le moteur audio
+    audio_engine = QuoniamAudioEngine()
+    audio_engine.start()
+
+    ft.run(main)

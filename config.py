@@ -55,6 +55,11 @@ AUDIO_FILES = {
 import json
 import os
 
+# Runtime state for audio engine (initialized here for Pylance)
+COOLDOWNS: dict[str, float] = {}
+ACTIVE_NOTES: dict[str, dict[int, float]] = {}
+INST_DYNAMICS: dict[str, float] = {}
+
 PROFILES_FILE = "profiles.json"
 
 def load_profiles():
