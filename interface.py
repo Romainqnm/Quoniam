@@ -1,4 +1,5 @@
 import flet as ft
+from flet import canvas as cv
 import threading
 import time
 from audio_engine import QuoniamAudioEngine
@@ -11,7 +12,20 @@ import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v15.0"
+    page.title = "QUONIAM v17.0"
+
+    # Lock to serialize all Flet .update() calls (prevents concurrent diff crash)
+    _ui_lock = threading.Lock()
+
+    def safe_update(*controls):
+        """Thread-safe update: acquires lock before any Flet .update() call."""
+        with _ui_lock:
+            for c in controls:
+                try:
+                    c.update()
+                except Exception:
+                    pass
+
     page.theme_mode = ft.ThemeMode.DARK
     page.window.width = 1200
     page.window.height = 800
@@ -21,12 +35,12 @@ def main(page: ft.Page):
     page.bgcolor = "#00000000"
 
     # --- INITIALISATION AUDIO (Séquentielle) ---
-    print("Lancement v15.0 Nappes Fluides...")
-    # PALETTES DE COULEURS
-    COLORS_ACCUEIL  = ["#0f0c29", "#302b63", "#24243e"]
-    COLORS_ELEMENTS = ["#b71c1c", "#d32f2f", "#f44336"] # Fire Red
-    COLORS_SAISONS  = ["#1b5e20", "#388e3c", "#4caf50"] # Earth Green
-    COLORS_ATMOS    = ["#4a148c", "#7b1fa2", "#9c27b0"] # Gemstone Purple 
+    print("Lancement v17.0 Kaleidoscope...")
+    # PALETTES DE COULEURS (v17.0 — deep, desaturated backgrounds for kaleidoscope contrast)
+    COLORS_ACCUEIL  = ["#08060f", "#1a1535", "#12101e"]
+    COLORS_ELEMENTS = ["#1a0505", "#2a0a0a", "#1f0808"]   # Deep ember
+    COLORS_SAISONS  = ["#051208", "#0a1f0e", "#081a0b"]   # Deep forest
+    COLORS_ATMOS    = ["#0d0520", "#160a30", "#110825"]   # Deep amethyst
 
     # MAP THEMES (Preset -> Kind, C1, C2)
     PRESET_THEMES = {
@@ -125,6 +139,15 @@ def main(page: ft.Page):
     # Initial placeholder
     icon_content = LiquidIcon("droplet", "#00bcd4", "#0288d1", scale=1.5)
     icon_display = ft.Container(content=icon_content, alignment=ft.Alignment(0,0))
+
+    # Counter-rotation for inner icon (stays upright while outer spins)
+    icon_counter_rotate = ft.Rotate(0, alignment=ft.Alignment(0, 0))
+    icon_display_wrapper = ft.Container(
+        content=icon_display,
+        alignment=ft.Alignment(0, 0),
+        rotate=icon_counter_rotate,
+        animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
+    )
     
     # L'AURA (GLOW)
     glow_shadow = ft.BoxShadow(
@@ -138,7 +161,7 @@ def main(page: ft.Page):
     icone_rotate = ft.Rotate(0, alignment=ft.Alignment(0, 0))
 
     container_icone = ft.Container(
-        content=icon_display,
+        content=icon_display_wrapper,
         alignment=ft.Alignment(0, 0),
         scale=1.0,
         rotate=icone_rotate,
@@ -150,127 +173,334 @@ def main(page: ft.Page):
         animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
 
-    # --- PARTICLE SYSTEM (v6) ---
-    class Particle:
-        def __init__(self, page_width, page_height):
-            self.page_width = page_width
-            self.page_height = page_height
-            self.size = random.randint(5, 15)
-            self.x = random.uniform(0, page_width)
-            self.y = random.uniform(0, page_height)
-            self.vx = random.uniform(-0.5, 0.5)
-            self.vy = random.uniform(-0.5, 0.5)
-            self.opacity = random.uniform(0.1, 0.4)
-            self.color = "white"
-            self.rotate = ft.Rotate(0)
+    # --- KALEIDOSCOPE VISUALIZER v17.0 ---
+    # Unified color palettes (6 colors per preset for layered blending)
+    KALEIDOSCOPE_COLORS = {
+        "home": ["#4dd0e1", "#00bcd4", "#0097a7", "#ffffff", "#b0bec5", "#cfd8dc"],
+        "elements": {
+            "feu":    ["#ff5722", "#ff9800", "#ffeb3b", "#ff6d00", "#e64a19", "#ffcc80"],
+            "eau":    ["#00bcd4", "#0288d1", "#4dd0e1", "#80deea", "#006064", "#b2ebf2"],
+            "terre":  ["#4caf50", "#2e7d32", "#81c784", "#a5d6a7", "#1b5e20", "#c8e6c9"],
+            "air":    ["#b0bec5", "#cfd8dc", "#eceff1", "#ffffff", "#78909c", "#e0e0e0"],
+            "espace": ["#311b92", "#673ab7", "#9575cd", "#b39ddb", "#4527a0", "#7e57c2"],
+        },
+        "saisons": {
+            "hiver":     ["#81d4fa", "#b3e5fc", "#e1f5fe", "#ffffff", "#4fc3f7", "#039be5"],
+            "printemps": ["#f48fb1", "#c5e1a5", "#e8f5e9", "#fce4ec", "#ce93d8", "#aed581"],
+            "ete":       ["#ff9800", "#ffeb3b", "#fff9c4", "#ffe0b2", "#ffca28", "#f57f17"],
+            "automne":   ["#a1887f", "#ff7043", "#d7ccc8", "#ffab91", "#795548", "#bcaaa4"],
+            "vide":      ["#4a148c", "#7b1fa2", "#ce93d8", "#1a1a1a", "#ea80fc", "#6a1b9a"],
+        },
+        "atmos": {
+            "zen":    ["#81c784", "#c8e6c9", "#a5d6a7", "#e8f5e9", "#4caf50", "#66bb6a"],
+            "cyber":  ["#00e676", "#2979ff", "#00e5ff", "#76ff03", "#00c853", "#1de9b6"],
+            "lofi":   ["#d7ccc8", "#795548", "#a1887f", "#bcaaa4", "#8d6e63", "#efebe9"],
+            "jungle": ["#1b5e20", "#4caf50", "#388e3c", "#66bb6a", "#2e7d32", "#a5d6a7"],
+            "indus":  ["#607d8b", "#ff5722", "#ff8a65", "#90a4ae", "#455a64", "#ffab91"],
+        },
+        "instruments": ["#FFD700", "#FFC107", "#FFE082", "#ffffff", "#FF9800", "#ffca28"],
+    }
 
-            self.container = ft.Container(
-                width=self.size, height=self.size,
-                bgcolor=self.color,
-                border_radius=50,
-                left=self.x, top=self.y,
-                opacity=self.opacity,
-                animate_position=ft.Animation(2000, ft.AnimationCurve.LINEAR),
-                animate_opacity=ft.Animation(1000, ft.AnimationCurve.EASE_IN_OUT),
-                animate_scale=ft.Animation(200, ft.AnimationCurve.BOUNCE_OUT), # v13.3: Visualizer pulse
-                rotate=self.rotate
+    # Theme config: (symmetry_arms, shape_types, normal_layers, focus_layers, rotation_speed, shape_scale)
+    KALEIDOSCOPE_THEMES = {
+        "feu":       (3,  ["teardrop", "arc"],          3, 6, 0.008, 1.2),
+        "eau":       (6,  ["circle", "crescent"],       3, 7, 0.005, 1.0),
+        "terre":     (4,  ["petal", "diamond"],          3, 6, 0.003, 1.1),
+        "air":       (8,  ["circle", "arc"],             4, 8, 0.010, 0.9),
+        "espace":    (5,  ["circle", "teardrop", "arc"], 4, 8, 0.012, 1.0),
+        "hiver":     (6,  ["diamond", "circle"],         3, 7, 0.004, 1.0),
+        "printemps": (5,  ["petal", "circle"],           4, 7, 0.006, 1.0),
+        "ete":       (4,  ["circle", "arc"],             3, 6, 0.007, 1.1),
+        "automne":   (4,  ["petal", "teardrop"],         3, 6, 0.005, 1.0),
+        "vide":      (7,  ["arc", "circle", "diamond"],  4, 8, 0.015, 0.8),
+        "zen":       (12, ["petal", "circle"],           4, 8, 0.002, 1.0),
+        "cyber":     (8,  ["diamond", "arc"],            4, 8, 0.020, 0.9),
+        "lofi":      (6,  ["circle", "petal"],           3, 6, 0.003, 1.0),
+        "jungle":    (5,  ["petal", "teardrop"],         3, 7, 0.004, 1.1),
+        "indus":     (8,  ["diamond", "arc"],            4, 8, 0.018, 0.9),
+        "_default":  (8,  ["circle", "petal"],           3, 6, 0.005, 1.0),
+    }
+
+    class KaleidoscopeEngine:
+        """Generates cv.Canvas shapes for a radially-symmetric kaleidoscope visualizer."""
+
+        def __init__(self):
+            self.width = 1200
+            self.height = 800
+            self.cx = 600.0
+            self.cy = 400.0
+            self.global_angle = 0.0
+            self.layers = []
+            self._last_theme = None
+            self._last_preset = None
+            self._symmetry = 8
+            self._shape_types = ["circle", "petal"]
+            self._palette = KALEIDOSCOPE_COLORS["home"]
+            self._normal_layers = 3
+            self._focus_layers = 6
+            self._rotation_speed = 0.005
+            self._shape_scale = 1.0
+
+        def resize(self, width, height):
+            self.width = max(width, 100)
+            self.height = max(height, 100)
+            self.cx = self.width / 2.0
+            self.cy = self.height / 2.0
+            self._rebuild_layers()
+
+        def _resolve_config(self):
+            coll = config.ETAT.get("collection")
+            preset = config.ETAT.get("preset")
+            theme = coll if coll in ("elements", "saisons", "atmos", "instruments") else "home"
+
+            if theme == self._last_theme and preset == self._last_preset:
+                return
+            self._last_theme = theme
+            self._last_preset = preset
+
+            entry = KALEIDOSCOPE_COLORS.get(theme, KALEIDOSCOPE_COLORS["home"])
+            if isinstance(entry, dict):
+                self._palette = entry.get(preset, list(entry.values())[0] if entry else KALEIDOSCOPE_COLORS["home"])
+            else:
+                self._palette = entry
+
+            key = preset if preset in KALEIDOSCOPE_THEMES else "_default"
+            params = KALEIDOSCOPE_THEMES[key]
+            self._symmetry = params[0]
+            self._shape_types = params[1]
+            self._normal_layers = params[2]
+            self._focus_layers = params[3]
+            self._rotation_speed = params[4]
+            self._shape_scale = params[5]
+            self._rebuild_layers()
+
+        def _rebuild_layers(self):
+            max_layers = self._focus_layers
+            self.layers = []
+            max_radius = min(self.width, self.height) * 0.42
+            for i in range(max_layers):
+                t = i / max(max_layers - 1, 1)
+                self.layers.append({
+                    "radius": 30 + t * (max_radius - 30),
+                    "angle_offset": i * (math.pi / max_layers) * 0.3,
+                    "shape_type": self._shape_types[i % len(self._shape_types)],
+                    "color_idx": i % len(self._palette),
+                    "rotation_dir": 1 if i % 2 == 0 else -1,
+                    "phase_offset": i * 0.4,
+                })
+
+        def _make_paint(self, color, opacity, style=None, stroke_width=None):
+            if style is None:
+                style = ft.PaintingStyle.FILL
+            p = ft.Paint(
+                color=ft.Colors.with_opacity(min(1.0, max(0.02, opacity)), color),
+                style=style,
+                anti_alias=True,
+            )
+            if stroke_width is not None:
+                p.stroke_width = stroke_width
+            return p
+
+        # --- Shape generators ---
+        def _shape_circle(self, cx, cy, r, color, opacity):
+            return cv.Circle(cx, cy, max(1, r), paint=self._make_paint(color, opacity))
+
+        def _shape_petal(self, cx, cy, size, angle, color, opacity):
+            s = max(size, 2)
+            cos_a, sin_a = math.cos(angle), math.sin(angle)
+            tip_x = cx + cos_a * s * 2
+            tip_y = cy + sin_a * s * 2
+            perp_cos = math.cos(angle + math.pi / 2)
+            perp_sin = math.sin(angle + math.pi / 2)
+            cp_dist = s * 0.8
+            mid_dist = s * 1.0
+            return cv.Path(
+                elements=[
+                    cv.Path.MoveTo(cx, cy),
+                    cv.Path.CubicTo(
+                        cx + cos_a * mid_dist + perp_cos * cp_dist,
+                        cy + sin_a * mid_dist + perp_sin * cp_dist,
+                        tip_x + perp_cos * cp_dist * 0.3,
+                        tip_y + perp_sin * cp_dist * 0.3,
+                        tip_x, tip_y
+                    ),
+                    cv.Path.CubicTo(
+                        tip_x - perp_cos * cp_dist * 0.3,
+                        tip_y - perp_sin * cp_dist * 0.3,
+                        cx + cos_a * mid_dist - perp_cos * cp_dist,
+                        cy + sin_a * mid_dist - perp_sin * cp_dist,
+                        cx, cy
+                    ),
+                    cv.Path.Close(),
+                ],
+                paint=self._make_paint(color, opacity)
             )
 
-        def update(self, theme_mode):
-            # v14.0: Audio-Reactive Advanced Visuals
-            intensity = config.ETAT.get("intensite", 30)
+        def _shape_teardrop(self, cx, cy, size, angle, color, opacity):
+            s = max(size, 2)
+            cos_a, sin_a = math.cos(angle), math.sin(angle)
+            tip_x = cx + cos_a * s * 2.5
+            tip_y = cy + sin_a * s * 2.5
+            perp_cos = math.cos(angle + math.pi / 2)
+            perp_sin = math.sin(angle + math.pi / 2)
+            bulge = s * 0.6
+            base_x = cx - cos_a * s * 0.3
+            base_y = cy - sin_a * s * 0.3
+            return cv.Path(
+                elements=[
+                    cv.Path.MoveTo(tip_x, tip_y),
+                    cv.Path.QuadraticTo(
+                        cx + perp_cos * bulge, cy + perp_sin * bulge,
+                        base_x, base_y, 1.0
+                    ),
+                    cv.Path.QuadraticTo(
+                        cx - perp_cos * bulge, cy - perp_sin * bulge,
+                        tip_x, tip_y, 1.0
+                    ),
+                    cv.Path.Close(),
+                ],
+                paint=self._make_paint(color, opacity)
+            )
+
+        def _shape_diamond(self, cx, cy, size, angle, color, opacity):
+            s = max(size, 2)
+            cos_a, sin_a = math.cos(angle), math.sin(angle)
+            perp_cos = math.cos(angle + math.pi / 2)
+            perp_sin = math.sin(angle + math.pi / 2)
+            return cv.Path(
+                elements=[
+                    cv.Path.MoveTo(cx + cos_a * s * 1.5, cy + sin_a * s * 1.5),
+                    cv.Path.LineTo(cx + perp_cos * s * 0.6, cy + perp_sin * s * 0.6),
+                    cv.Path.LineTo(cx - cos_a * s * 1.5, cy - sin_a * s * 1.5),
+                    cv.Path.LineTo(cx - perp_cos * s * 0.6, cy - perp_sin * s * 0.6),
+                    cv.Path.Close(),
+                ],
+                paint=self._make_paint(color, opacity)
+            )
+
+        def _shape_arc(self, cx, cy, size, angle, color, opacity):
+            s = max(size * 1.5, 3)
+            return cv.Arc(
+                cx - s, cy - s, s * 2, s * 2,
+                start_angle=angle,
+                sweep_angle=math.pi / max(self._symmetry, 1),
+                use_center=False,
+                paint=self._make_paint(color, opacity, ft.PaintingStyle.STROKE,
+                                       stroke_width=max(1, size * 0.15))
+            )
+
+        def _shape_crescent(self, cx, cy, size, angle, color, opacity):
+            s = max(size, 2)
+            cos_a, sin_a = math.cos(angle), math.sin(angle)
+            offset_d = s * 0.3
+            return cv.Path(
+                elements=[
+                    cv.Path.MoveTo(cx, cy - s),
+                    cv.Path.ArcTo(cx, cy + s, s, 0, True, True),
+                    cv.Path.ArcTo(cx + cos_a * offset_d, cy - s + sin_a * offset_d,
+                                  s * 0.7, 0, False, False),
+                    cv.Path.Close(),
+                ],
+                paint=self._make_paint(color, opacity)
+            )
+
+        def _make_shape(self, shape_type, cx, cy, radius, angle, color, opacity, scale):
+            size = radius * 0.18 * scale
+            if shape_type == "circle":
+                return self._shape_circle(cx, cy, size, color, opacity)
+            elif shape_type == "petal":
+                return self._shape_petal(cx, cy, size, angle, color, opacity)
+            elif shape_type == "teardrop":
+                return self._shape_teardrop(cx, cy, size, angle, color, opacity)
+            elif shape_type == "diamond":
+                return self._shape_diamond(cx, cy, size, angle, color, opacity)
+            elif shape_type == "arc":
+                return self._shape_arc(cx, cy, size, angle, color, opacity)
+            elif shape_type == "crescent":
+                return self._shape_crescent(cx, cy, size, angle, color, opacity)
+            return None
+
+        def generate_frame(self, is_focus):
+            self._resolve_config()
+            if not self.layers:
+                return []
+
+            t = time.time()
             bpm = config.ETAT.get("bpm", 120)
-            
-            # Pulse size based on audio intensity
-            pulse = math.sin(time.time() * (bpm / 60.0) * math.pi) 
-            scale_factor = 1.0 + (intensity / 100.0 * 0.5) + (pulse * 0.2)
-            self.container.scale = scale_factor
-            
-            # Speed Factor
-            speed_factor = 0.5 + (intensity / 50.0)
+            intensity = config.ETAT.get("intensite", 30)
+            vitesse = config.ETAT.get("vitesse", 50)
 
-            # Theme Behavior
-            if theme_mode == "elements": # Rising Bubbles
-                self.vy = -1.0 * speed_factor - random.uniform(0, 1)
-                self.vx = math.sin(time.time() + self.x) * 0.5 # Wobble
-                if random.random() < 0.05: self.opacity = random.uniform(0.1, 0.6)
-                
-            elif theme_mode == "saisons": # Falling Petals
-                self.vy = 1.0 * speed_factor + random.uniform(0, 1)
-                self.vx = math.cos(time.time() + self.y) * 1.5 # Sway
-                self.rotate.angle += 0.05
-                
-            elif theme_mode == "atmos": # Cyber/Static
-                # Glitch movement
-                if random.random() < 0.05:
-                     self.x = random.uniform(0, self.page_width)
-                     self.y = random.uniform(0, self.page_height)
-                self.vx = 0
-                self.vy = 0
-                self.opacity = random.uniform(0.1, 0.5) + (pulse * 0.1)
+            bpm_factor = bpm / 60.0
+            breath = math.sin(t * bpm_factor * math.pi)
+            intensity_mult = 0.5 + (intensity / 100.0)
+            speed_mult = 0.3 + (vitesse / 100.0) * 1.7
 
-            elif theme_mode == "instruments": # ORCHESTRA: Orbiting Stars
-                # Orchestra Mode: Orbit around center
-                center_x = self.page_width / 2
-                center_y = self.page_height / 3 # Near the icon
-                
-                dx = self.x - center_x
-                dy = self.y - center_y
-                dist = math.sqrt(dx*dx + dy*dy) + 1
-                
-                # Orbit logic
-                angle = math.atan2(dy, dx)
-                angle += 0.02 * speed_factor # Rotate
-                
-                # Spiral out/in based on intensity
-                radius = dist + math.sin(time.time()) * 2
-                
-                # Reposition
-                self.x = center_x + math.cos(angle) * radius
-                self.y = center_y + math.sin(angle) * radius
-                
-                self.container.bgcolor = "#FFD700" if random.random() < 0.3 else "white"
+            self.global_angle += self._rotation_speed * speed_mult
 
-            else: # Home / Default (Slow float)
-                self.container.bgcolor = "white"
-                self.vx = random.uniform(-0.5, 0.5)
-                self.vy = random.uniform(-0.5, 0.5)
+            visible_count = self._focus_layers if is_focus else self._normal_layers
+            base_opacity = 0.22 if is_focus else 0.10
+            max_opacity = 0.42 if is_focus else 0.22
 
-            # Update Position (unless overridden by specific themes like atmos/orchestra which set x/y directly)
-            if theme_mode not in ["atmos", "instruments"]:
-                self.x += self.vx
-                self.y += self.vy
-            
-            # Wrap around screen
-            if self.x > self.page_width: self.x = 0
-            if self.x < 0: self.x = self.page_width
-            if self.y > self.page_height: self.y = 0
-            if self.y < 0: self.y = self.page_height
-            
-            self.container.left = self.x
-            self.container.top = self.y
-            self.container.opacity = self.opacity
+            shapes = []
+            arm_angle = 2 * math.pi / max(self._symmetry, 1)
 
-    particles = [Particle(450, 800) for _ in range(20)]
-    particle_layer = ft.Stack([p.container for p in particles])
+            for li, layer in enumerate(self.layers):
+                if li >= visible_count:
+                    break
+
+                layer_speed = (0.3 + li * 0.15) * speed_mult
+                layer_angle = (self.global_angle * layer["rotation_dir"] * layer_speed
+                               + layer["angle_offset"])
+
+                pulse_factor = 0.06 + (li / max(len(self.layers), 1)) * 0.10
+                scale = (1.0 + abs(breath) * pulse_factor * intensity_mult) * self._shape_scale
+
+                radius = layer["radius"] * scale
+                color = self._palette[layer["color_idx"] % len(self._palette)]
+
+                layer_t = li / max(visible_count - 1, 1)
+                opacity = base_opacity + layer_t * (max_opacity - base_opacity)
+                opacity += abs(breath) * 0.08
+                opacity = min(1.0, max(0.02, opacity))
+
+                for arm in range(self._symmetry):
+                    angle = layer_angle + arm * arm_angle
+                    sx = self.cx + math.cos(angle) * radius * 0.5
+                    sy = self.cy + math.sin(angle) * radius * 0.5
+
+                    shape = self._make_shape(
+                        layer["shape_type"], sx, sy, radius, angle,
+                        color, opacity, scale
+                    )
+                    if shape:
+                        shapes.append(shape)
+
+            return shapes
+
+    # --- KALEIDOSCOPE CANVAS ---
+    kaleidoscope_engine = KaleidoscopeEngine()
+
+    def on_canvas_resize(e: cv.CanvasResizeEvent):
+        kaleidoscope_engine.resize(e.width, e.height)
+
+    kaleidoscope_canvas = cv.Canvas(
+        shapes=[],
+        expand=True,
+        on_resize=on_canvas_resize,
+    )
 
     def animer_fond():
         while True:
-            current_theme = "home"
-            coll = config.ETAT.get("collection")
-            if coll == "elements": current_theme = "elements"
-            elif coll == "saisons": current_theme = "saisons"
-            elif coll == "atmos": current_theme = "atmos"
-            elif coll == "instruments": current_theme = "instruments"
-            
-            for p in particles:
-                p.update(current_theme)
-            
             try:
-                # v13.3 Fix: Update only the layer, not the whole page (Concurrency Crash Fix)
-                particle_layer.update()
-            except: pass
-            time.sleep(0.05) # Smoother 20FPS
+                shapes = kaleidoscope_engine.generate_frame(focus_mode)
+                kaleidoscope_canvas.shapes = shapes
+                safe_update(kaleidoscope_canvas)
+            except Exception:
+                pass
+            time.sleep(0.05)  # 20 FPS
+
+
+
 
     # --- GLOBAL AUDIO PLAYER (v13.0 - Pygame Backend) ---
     # --- GLOBAL AUDIO PLAYER (v13.3 - Dual Channel Crossfade) ---
@@ -382,8 +612,6 @@ def main(page: ft.Page):
     # INSTANCE GLOBALE (Moved up for scope visibility)
     global_audio = GlobalAudioPlayer()
 
-    threading.Thread(target=animer_fond, daemon=True).start()
-
     # --- UI COMPONENTS ---
     # ...
     
@@ -413,19 +641,57 @@ def main(page: ft.Page):
         animate=ft.Animation(2000, ft.AnimationCurve.EASE_OUT_CUBIC)
     )
     
-    # Layer 1: Particles (particle_layer)
-    # Layer 2: Main Content (Will be set in main_layout_stack.controls)
+    # Layer 1: Kaleidoscope Canvas (kaleidoscope_canvas)
+    # Layer 2: Main Content (content_layer)
     
     # TITLE BAR REMOVED PER USER REQUEST
     # The application will remain frameless but without custom controls for now.
 
-    content_layer = ft.Container(expand=True)  # Placeholder for content
+    content_layer = ft.Container(
+        expand=True,
+        animate_opacity=ft.Animation(500, ft.AnimationCurve.EASE_IN_OUT)
+    )
+
+    # --- FOCUS MODE (v17.0 — Kaleidoscope) ---
+    focus_mode = False
+
+    def toggle_focus(e):
+        nonlocal focus_mode
+        focus_mode = not focus_mode
+        if focus_mode:
+            content_layer.opacity = 0
+            focus_exit_hint.visible = True
+            focus_exit_hint.opacity = 1
+        else:
+            content_layer.opacity = 1
+            focus_exit_hint.opacity = 0
+            focus_exit_hint.visible = False
+        safe_update(page)
+
+    focus_exit_hint = ft.Container(
+        content=ft.Row([
+            ft.Text("\U0001F441", size=14),
+            ft.Text("EXIT FOCUS", size=10, weight=ft.FontWeight.BOLD,
+                     color="#88ffffff")
+        ], spacing=5),
+        on_click=toggle_focus,
+        bottom=20, right=20,
+        padding=ft.Padding(left=12, top=8, right=12, bottom=8),
+        border_radius=20,
+        bgcolor=ft.Colors.with_opacity(0.3, "black"),
+        border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+        visible=False,
+        opacity=0,
+        animate_opacity=ft.Animation(500, ft.AnimationCurve.EASE_IN_OUT),
+        ink=True,
+    )
 
     main_layout_stack = ft.Stack(
         [
             bg_gradient,
-            particle_layer,
-            content_layer
+            kaleidoscope_canvas,   # v17.0 Canvas kaleidoscope visualizer
+            content_layer,
+            focus_exit_hint,
         ],
         expand=True
     )
@@ -475,18 +741,24 @@ def main(page: ft.Page):
                     current_scale = 1.0 + (max_growth * abs(cycle))
                     
                     container_icone.scale = current_scale
-                    container_icone.update()
-                    
+
                     # Aura Pulse (Sync with cycle)
                     glow_shadow.spread_radius = 5 + (intensite/5) * abs(cycle)
                     glow_shadow.color = ft.Colors.with_opacity(0.3 + (abs(cycle)*0.3), "white")
-                    
-                    # Spin for Space Themes
+
+                    # Spin for Space Themes (with counter-rotation for inner icon)
                     if config.ETAT.get("preset") in ["espace", "vide", "cyber", "indus"]:
-                        angle += 1.0 
+                        angle += 1.0
                         icone_rotate.angle = angle
-                    
-                    container_icone.update()
+                        icon_counter_rotate.angle = -angle  # Counter-rotate inner icon
+                    else:
+                        # Reset rotation when leaving space themes
+                        if angle != 0:
+                            angle = 0
+                            icone_rotate.angle = 0
+                            icon_counter_rotate.angle = 0
+
+                    safe_update(container_icone)
                     
                     time.sleep(0.05) # fast loop for smooth animation
                 else:
@@ -589,11 +861,11 @@ def main(page: ft.Page):
                  
                  update_recursive(main_col.controls)
                  
-             except Exception as e: 
+             except Exception as e:
                  # print(f"UI Update Error: {e}")
                  pass
-             
-        page.update()
+
+        safe_update(page)
 
     def changer_valeur(e, cle):
         config.ETAT[cle] = e.control.value
@@ -637,11 +909,11 @@ def main(page: ft.Page):
                 try:
                     btn_play_content.value = "▶  PLAY"
                     btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
-                    page.update()
-                    
+                    safe_update(page)
+
                     snack = ft.SnackBar(ft.Text(f"Zen Session Finished ({minutes} min)", color="white"), bgcolor="#4caf50", open=True)
                     page.overlay.append(snack)
-                    page.update()
+                    safe_update(page)
                 except: pass
                 
         threading.Thread(target=timer_thread, daemon=True).start()
@@ -651,7 +923,7 @@ def main(page: ft.Page):
         kind, c1, c2 = PRESET_THEMES[preset_code]
         container_icone.content = LiquidIcon(kind, c1, c2, scale=1.0)
         # Also update particles color if needed (optional, handled by update_ui loop mostly)
-        container_icone.update()
+        safe_update(container_icone)
 
     def charger_interface_controle(nom_collection):
         config.ETAT["collection"] = nom_collection
@@ -676,7 +948,7 @@ def main(page: ft.Page):
             if "instruments_actifs" not in config.ETAT: config.ETAT["instruments_actifs"] = []
             
             presets_controls = creer_boutons_instruments()
-            bg_grad.colors = ["#3e2723", "#5d4037", "#795548"] # Bronze/Gold theme
+            bg_grad.colors = ["#120d08", "#1f1610", "#1a130d"]  # Deep bronze
             glow_shadow.color = ft.Colors.with_opacity(0.5, "orange") 
             container_icone.content = LiquidIcon("note", "#ff9800", "#ffca28", scale=1.0) # New Note Icon
             
@@ -688,22 +960,21 @@ def main(page: ft.Page):
             container_icone.content = LiquidIcon("orb", "#4a148c", "#9c27b0", scale=1.0) # Reset to Orb 
             
         container_presets.content = presets_controls
-        
+
         content_layer.content = creer_contenu_controle()
-        page.update()
+        safe_update(page)
         
         config.ETAT["actif"] = True 
         update_ui()
 
     def retour_accueil(e):
         config.ETAT["collection"] = None
-        config.ETAT["actif"] = False 
-        config.ETAT["mode_orchestre"] = False # Disable Orchestra mode 
-        
+        config.ETAT["actif"] = False
+        config.ETAT["mode_orchestre"] = False # Disable Orchestra mode
+
         bg_grad.colors = COLORS_ACCUEIL
         content_layer.content = creer_contenu_accueil()
-        page.update()
-        page.update()
+        safe_update(page)
 
 
 
@@ -795,7 +1066,7 @@ def main(page: ft.Page):
             ft.Row(controls=liste_cartes_ambiance, alignment=ft.MainAxisAlignment.CENTER, wrap=True, spacing=10),
 
             ft.Container(expand=True),
-            ft.Text("v15.0 Nappes Fluides", size=10, color="#44ffffff")
+            ft.Text("v17.0 Kaleidoscope", size=10, color="#44ffffff")
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def creer_contenu_controle():
@@ -835,16 +1106,16 @@ def main(page: ft.Page):
                  # But get_ui_icon returns a new Image. Better to update the container content.
                  new_icon = get_ui_icon(assets.SVG_PLAY if is_paused else assets.SVG_PAUSE, size=20)
                  e.control.content = new_icon
-                 e.control.update()
+                 safe_update(e.control)
 
         def mute_click(e):
             is_muted = global_audio.toggle_mute()
             # Update Icon
             # e.control is the Container
-            new_icon = get_ui_icon(assets.SVG_MUTE if is_muted else assets.SVG_VOLUME, 
+            new_icon = get_ui_icon(assets.SVG_MUTE if is_muted else assets.SVG_VOLUME,
                                   color="#ff4444" if is_muted else "white", size=20)
             e.control.content = new_icon
-            e.control.update()
+            safe_update(e.control)
 
         def volume_change(e):
             global_audio.set_volume(e.control.value)
@@ -882,7 +1153,7 @@ def main(page: ft.Page):
                 ft.Container(expand=True),
                 ft.Row([
                     ft.Text("LIQUID SOUL", size=18, weight=ft.FontWeight.BOLD, color="white", font_family="Verdana"),
-                    ft.Text("v15.0", size=10, color="#88ffffff", italic=True)
+                    ft.Text("v17.0", size=10, color="#88ffffff", italic=True)
                 ], spacing=5),
                 ft.Container(expand=True),
                 # We replace the top_bar (navigation) with audio controls here? 
@@ -898,8 +1169,17 @@ def main(page: ft.Page):
                 # Or better: Back | Audio Controls | Nav.
                 
                 ctrl_bar,
-                
-                ft.Container(width=10),
+
+                ft.Container(width=5),
+                ft.Container(
+                    content=ft.Text("\U0001F441", size=16),
+                    on_click=toggle_focus,
+                    tooltip="Focus Mode",
+                    padding=5,
+                    border_radius=50,
+                    ink=True,
+                ),
+                ft.Container(width=5),
                 top_bar,
                 
             ], alignment=ft.MainAxisAlignment.CENTER),
@@ -964,42 +1244,58 @@ def main(page: ft.Page):
         }
         svg_content = mapping.get(icon_key, assets.SVG_NOTE)
         b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
-        
+
+        # v17.0 Liquid Glass preset button
+        icon_with_glow = ft.Container(
+            content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
+                             width=32, height=32,
+                             color=c1,
+                             fit=ft.BoxFit.CONTAIN),
+            alignment=ft.Alignment(0, 0),
+            width=42, height=42,
+            border_radius=50,
+            gradient=ft.RadialGradient(
+                colors=[ft.Colors.with_opacity(0.25, c1),
+                        ft.Colors.with_opacity(0.0, c1)],
+            ),
+        )
+
         return ft.Container(
             content=ft.Column([
-                ft.Container(
-                    content=ft.Image(src=f"data:image/svg+xml;base64,{b64}", 
-                                   width=42, height=42, 
-                                   color="white",
-                                   fit=ft.BoxFit.CONTAIN),
-                    alignment=ft.Alignment(0,0),
-                    height=45
-                ),
-                ft.Text(nom, size=10, color="white", weight=ft.FontWeight.BOLD, 
-                       style=ft.TextStyle(shadow=ft.BoxShadow(blur_radius=3, color=ft.Colors.with_opacity(1.0, "black"), offset=ft.Offset(1, 1))))
-            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
-            data=code, 
+                icon_with_glow,
+                ft.Text(nom, size=9, color="#ccffffff", weight=ft.FontWeight.BOLD,
+                       style=ft.TextStyle(shadow=ft.BoxShadow(blur_radius=4, color="black", offset=ft.Offset(0, 1))))
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
+            data=code,
             on_click=lambda e: [changer_preset(e), update_central_icon_for_preset(code)],
-            width=70, height=80,
-            border_radius=15,
+            width=75, height=85,
+            border_radius=22,
             gradient=ft.LinearGradient(
-                begin=ft.Alignment(-1.0, -1.0),
-                end=ft.Alignment(1.0, 1.0),
+                begin=ft.Alignment(-0.5, -1.0),
+                end=ft.Alignment(0.5, 1.0),
                 colors=[
-                    ft.Colors.with_opacity(0.1, "white"),
+                    ft.Colors.with_opacity(0.18, "white"),
+                    ft.Colors.with_opacity(0.06, "white"),
                     ft.Colors.with_opacity(0.02, "white"),
                 ],
             ),
-            border=ft.Border.all(1, ft.Colors.with_opacity(0.15, "white")),
-            shadow=ft.BoxShadow(
-                blur_radius=10,
-                spread_radius=-5,
-                color=c1,
-                offset=ft.Offset(0, 5)
+            border=ft.Border(
+                top=ft.BorderSide(1.5, ft.Colors.with_opacity(0.35, "white")),
+                left=ft.BorderSide(1, ft.Colors.with_opacity(0.15, "white")),
+                right=ft.BorderSide(1, ft.Colors.with_opacity(0.08, "white")),
+                bottom=ft.BorderSide(1, ft.Colors.with_opacity(0.05, "white")),
             ),
+            shadow=ft.BoxShadow(
+                blur_radius=18, spread_radius=-2,
+                color=ft.Colors.with_opacity(0.5, c1),
+                offset=ft.Offset(0, 6),
+                blur_style=ft.BlurStyle.OUTER,
+            ),
+            blur=ft.Blur(8, 8),
             padding=5,
             ink=True,
-            tooltip=nom
+            tooltip=nom,
+            animate_scale=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
         )
 
     def creer_boutons_elements():
@@ -1063,7 +1359,7 @@ def main(page: ft.Page):
                 e.control.content.controls[0].color = "#FFD700" # Icon Gold
                 
             config.ETAT["instruments_actifs"] = actifs
-            e.control.update()
+            safe_update(e.control)
 
         def get_asset(code):
             mapping = {
@@ -1176,7 +1472,7 @@ def main(page: ft.Page):
                         btn.content.color = base_color if is_active else "#88ffffff"
                     
                     btn.scale = 1.1 if is_active else 1.0
-                    btn.update()
+                    safe_update(btn)
                 except RuntimeError:
                     pass
 
@@ -1223,26 +1519,56 @@ def main(page: ft.Page):
         def emotion_btn(icon_key, val, tooltip):
              # Initial State Calculation
              is_active = config.ETAT.get("emotion") == val
-             
+
              # Determine Color
              if val.startswith("profile_"):
                  base_color = "#00BCD4" # Cyan
              else:
                  base_color = EMOTION_COLORS.get(val, "white")
-             
+
              # Prepare SVG
              svg_content = get_emotion_asset(val)
              b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
-             
+
+             # v17.0 Liquid Glass emotion button
+             icon_glow = ft.Container(
+                 content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
+                                  width=20, height=20,
+                                  color=base_color if is_active else "#aaffffff",
+                                  fit=ft.BoxFit.CONTAIN),
+                 alignment=ft.Alignment(0, 0),
+                 width=30, height=30,
+                 border_radius=50,
+                 gradient=ft.RadialGradient(
+                     colors=[ft.Colors.with_opacity(0.3 if is_active else 0.0, base_color),
+                             ft.Colors.with_opacity(0.0, base_color)],
+                 ),
+             )
+
              return ft.Container(
-                content=ft.Image(src=f"data:image/svg+xml;base64,{b64}", 
-                                width=22, height=22, 
-                                color=base_color if is_active else "#88ffffff",
-                                fit=ft.BoxFit.CONTAIN),
-                padding=10,
-                bgcolor=ft.Colors.with_opacity(0.2, base_color) if is_active else ft.Colors.with_opacity(0.05, "white"),
-                border_radius=10,
-                border=ft.Border.all(2, base_color) if is_active else ft.Border.all(1, ft.Colors.with_opacity(0.1, "white")),
+                content=icon_glow,
+                padding=6,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment(-0.5, -1.0),
+                    end=ft.Alignment(0.5, 1.0),
+                    colors=[
+                        ft.Colors.with_opacity(0.20 if is_active else 0.10, "white"),
+                        ft.Colors.with_opacity(0.05, "white"),
+                    ],
+                ),
+                border=ft.Border(
+                    top=ft.BorderSide(1.5 if is_active else 1, ft.Colors.with_opacity(0.4 if is_active else 0.2, base_color if is_active else "white")),
+                    left=ft.BorderSide(1, ft.Colors.with_opacity(0.15, "white")),
+                    right=ft.BorderSide(1, ft.Colors.with_opacity(0.08, "white")),
+                    bottom=ft.BorderSide(1, ft.Colors.with_opacity(0.05, "white")),
+                ),
+                shadow=ft.BoxShadow(
+                    blur_radius=12 if is_active else 0,
+                    color=ft.Colors.with_opacity(0.4, base_color),
+                    blur_style=ft.BlurStyle.OUTER,
+                ),
+                blur=ft.Blur(6, 6),
                 on_click=change_emotion,
                 tooltip=tooltip,
                 ink=True,
@@ -1272,7 +1598,7 @@ def main(page: ft.Page):
                 items.append(emotion_btn("user", f"profile_{name}", f"Load {name}"))
             row_custom_profiles.controls = items
             try:
-                if row_custom_profiles.page: row_custom_profiles.update()
+                if row_custom_profiles.page: safe_update(row_custom_profiles)
             except RuntimeError:
                 pass
 
@@ -1283,7 +1609,7 @@ def main(page: ft.Page):
         def show_dialog(title, content, actions):
             def close_dialog(e):
                 main_layout_stack.controls.pop()
-                page.update()
+                safe_update(page)
 
             dialog_container = ft.Container(
                 content=ft.Column([
@@ -1312,7 +1638,7 @@ def main(page: ft.Page):
             )
             
             main_layout_stack.controls.append(overlay)
-            page.update()
+            safe_update(page)
 
         def save_profile_click(e):
             txt_name = ft.TextField(label="Profile Name", value=f"Profile {len(config.ETAT.get('custom_profiles', {})) + 1}", border_color="white", color="white")
@@ -1342,12 +1668,12 @@ def main(page: ft.Page):
                 refresh_profiles_row()
                 
                 main_layout_stack.controls.pop()
-                page.update()
-                
+                safe_update(page)
+
                 # Feedback
                 btn_save_text.value = "✅ SAVED"
                 btn_save_text.color = "#4caf50"
-                btn_save.update()
+                safe_update(btn_save)
                 import time
                 def reset_btn():
                     import time
@@ -1356,7 +1682,7 @@ def main(page: ft.Page):
                         if not btn_save.page: return # Safety check
                         btn_save_text.value = "💾 SAVE PROFILE"
                         btn_save_text.color = "#88ffffff"
-                        btn_save.update()
+                        safe_update(btn_save)
                     except RuntimeError:
                         pass
                 threading.Thread(target=reset_btn, daemon=True).start()
@@ -1450,7 +1776,7 @@ def main(page: ft.Page):
             elif key == "gravite": lbl_gravite.value = f"{int(val)}"
             
             try:
-                page.update()
+                safe_update(page)
             except: pass
 
         # BPM Control Logic
@@ -1459,10 +1785,7 @@ def main(page: ft.Page):
             new_bpm = max(40, min(200, current + delta))
             config.ETAT["bpm"] = new_bpm
             lbl_bpm.value = f"{new_bpm} BPM"
-            lbl_bpm.update()
-            
-            lbl_bpm.value = f"{new_bpm} BPM"
-            lbl_bpm.update()
+            safe_update(lbl_bpm)
             
         # lbl_bpm was here, now global
         
@@ -1521,7 +1844,7 @@ def main(page: ft.Page):
                  lancer_zen_timer(mins)
                  snack = ft.SnackBar(ft.Text(f"Zen Timer set for {mins} minutes", color="white"), bgcolor="#2196f3", open=True)
                  page.overlay.append(snack)
-                 page.update()
+                 safe_update(page)
 
         dd_timer = ft.Dropdown(
             options=[
@@ -1602,7 +1925,7 @@ def main(page: ft.Page):
     thread_fond.start()
 
 if __name__ == "__main__":
-    print("Lancement v15.0 Nappes Fluides...")
+    print("Lancement v17.0 Kaleidoscope...")
 
     # Initialiser et démarrer le moteur audio
     audio_engine = QuoniamAudioEngine()
