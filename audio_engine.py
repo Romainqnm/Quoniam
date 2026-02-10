@@ -10,6 +10,7 @@ import os
 import time
 import threading
 from gammes import TOUTES_GAMMES
+from ai_conductor import AIConductor
 import config
 
 
@@ -32,6 +33,9 @@ class QuoniamAudioEngine:
 
         # État musical
         self.note_courante = 60
+
+        # AI Conductor
+        self.conductor = AIConductor()
 
         # Initialiser la session SCAMP
         self._init_scamp_session()
@@ -359,7 +363,7 @@ class QuoniamAudioEngine:
             wait(attente)
 
     def _play_orchestra_mode(self):
-        """Gère la lecture en mode orchestre (logique complète conservée)."""
+        """Gère la lecture en mode orchestre avec AI Conductor."""
         actifs = config.ETAT.get("instruments_actifs", [])
         if not actifs:
             wait(0.5)
@@ -386,35 +390,120 @@ class QuoniamAudioEngine:
             target_key = current_emotion
 
         target_data = EMOTIONS.get(target_key, EMOTIONS["joyeux"])
-
-        # Auto-drift
-        if config.ETAT.get("mode_auto", False):
-            self._apply_auto_drift(target_data)
-
         gamme = target_data["gamme"]
 
         # Skip MIDI pour audio loop
-        current_collection = config.ETAT.get("collection")
-        if current_collection in ["elements", "saisons", "atmos"]:
+        if config.ETAT.get("collection") in ["elements", "saisons", "atmos"]:
             wait(1.0)
             return
 
         bpm = config.ETAT.get("bpm", 120)
-        intensite = config.ETAT["intensite"]
-        chaos = config.ETAT["chaos"]
-
         attente = 60.0 / bpm
         attente = self.humaniser(attente, 0.05)
 
-        # Sélection de note (random walk)
+        # ── AI Conductor update ──
+        if config.ETAT.get("mode_auto", False):
+            self.conductor.update(attente, target_data)
+
+        current_time = time.time()
+
+        for inst_name in actifs:
+            if inst_name not in self.instruments:
+                continue
+            if inst_name in target_data.get("excluded", []):
+                continue
+
+            # Conductor decides if this instrument plays
+            if config.ETAT.get("mode_auto", False):
+                if not self.conductor.should_play(inst_name, target_data):
+                    continue
+            else:
+                # Legacy threshold when auto is off
+                threshold = 0.9 if inst_name in target_data.get("preferred", []) else 0.7
+                if random.random() > threshold:
+                    continue
+
+            # Cooldown check
+            is_polyphonic = inst_name in self.conductor.POLYPHONIC
+            last_end = config.COOLDOWNS.get(inst_name, 0)
+            if not is_polyphonic:
+                if current_time < last_end - 0.1:
+                    continue
+
+            # Density limit
+            if len(actifs) > 8:
+                skip_chance = 0.5 if is_polyphonic else 0.8
+                if random.random() < skip_chance:
+                    continue
+
+            inst = self.instruments[inst_name]
+
+            # ── Pitch: voice leading + tessitura ──
+            if inst_name == "batterie":
+                pitch = random.choice([35, 38, 42, 46])
+            elif config.ETAT.get("mode_auto", False):
+                pitch = self.conductor.voice_lead(inst_name, gamme)
+            else:
+                pitch = self._legacy_note_select(gamme, target_data)
+
+            # ── Velocity: Gaussian humanization ──
+            base_vol = 0.2 + (config.ETAT["intensite"] / 200.0)
+            current_dyn = config.INST_DYNAMICS.get(inst_name, 1.0)
+            if random.random() < 0.1:
+                drift = random.uniform(-0.05, 0.05)
+                current_dyn = max(0.4, min(1.3, current_dyn + drift))
+                config.INST_DYNAMICS[inst_name] = current_dyn
+            vol = self.conductor.humanize_velocity(base_vol * current_dyn)
+
+            # ── Duration: density-aware ──
+            if config.ETAT.get("mode_auto", False):
+                sound_duration = self.conductor.suggest_duration(inst_name, attente)
+            else:
+                mult = random.uniform(3.0, 6.0) if is_polyphonic else random.uniform(2.5, 8.0)
+                sound_duration = attente * mult
+
+            # Cooldown
+            if is_polyphonic:
+                config.COOLDOWNS[inst_name] = current_time + attente
+            else:
+                config.COOLDOWNS[inst_name] = current_time + (sound_duration * 0.95)
+
+            # Anti-mud check
+            active_notes = config.ACTIVE_NOTES.get(inst_name, {})
+            if pitch in active_notes and active_notes[pitch] > current_time:
+                if random.random() < 0.8:
+                    continue
+
+            active_notes[pitch] = current_time + sound_duration
+            config.ACTIVE_NOTES[inst_name] = {k: v for k, v in active_notes.items() if v > current_time}
+
+            # Envelope fluide
+            final_vol = vol
+            if sound_duration > 1.5:
+                peak_vol = min(1.0, vol * 1.3)
+                end_vol = 0.0 if not is_polyphonic else vol * 0.2
+                try:
+                    final_vol = Envelope.from_levels(
+                        [vol * 0.1, peak_vol, end_vol],
+                        [sound_duration * 0.4, sound_duration * 0.6],
+                        curve_shapes=[3, -3]  # type: ignore[call-arg]
+                    )
+                except:
+                    final_vol = vol
+
+            inst.play_note(pitch, final_vol, sound_duration, blocking=False)
+
+        wait(attente)
+
+    def _legacy_note_select(self, gamme, target_data):
+        """Original random walk note selection (non-conductor mode)."""
+        chaos = config.ETAT["chaos"]
         direction = random.choice([-1, 1])
         if random.random() * 100 < chaos:
             direction *= -1
-
         saut = 1
         if random.random() * 100 < chaos:
             saut = random.randint(2, 4)
-
         try:
             curr = min(gamme, key=lambda x: abs(x - self.note_courante))
             curr_idx = gamme.index(curr)
@@ -422,219 +511,12 @@ class QuoniamAudioEngine:
             note_brute = gamme[new_idx]
         except:
             note_brute = 60
-
         self.note_courante = note_brute
-
-        # Cooldowns et polyphonie
-
-        # Fix #1: "marimba" restauré
-        POLYPHONIC_INSTRUMENTS = ["piano", "harpe", "guitare", "batterie", "celesta", "marimba", "orgue", "timbales"]
-
-        current_time = time.time()
-        active_count = len(actifs)
-        density_limit = 8
-
-        for inst_name in actifs:
-            if inst_name not in self.instruments:
-                continue
-
-            if inst_name in target_data.get("excluded", []):
-                continue
-
-            threshold = 0.7
-            if inst_name in target_data.get("preferred", []):
-                threshold = 0.9
-
-            # Fix #3: v14.2 Auto-Drift Intro Factor
-            current_intro_factor = 1.0
-            if config.ETAT.get("mode_auto", False):
-                intro_start = config.ETAT.get("auto_start_time", 0)
-                intro_len = 30.0
-                if current_time - intro_start < intro_len:
-                    progress = (current_time - intro_start) / intro_len
-                    current_intro_factor = max(0.1, progress)
-                    # Scale probability (Density Ramp)
-                    threshold = threshold * current_intro_factor
-
-            # Fix #4: v14.2 Dynamic Expression (INST_DYNAMICS)
-            current_dyn = config.INST_DYNAMICS.get(inst_name, 1.0)
-            if random.random() < 0.1:
-                drift = random.uniform(-0.05, 0.05)
-                current_dyn = max(0.4, min(1.3, current_dyn + drift))
-                config.INST_DYNAMICS[inst_name] = current_dyn
-
-            # Cooldown check
-            last_end = config.COOLDOWNS.get(inst_name, 0)
-            is_polyphonic = inst_name in POLYPHONIC_INSTRUMENTS
-
-            if not is_polyphonic:
-                if current_time < last_end - 0.1:
-                    continue
-
-            # Density check
-            if active_count > density_limit:
-                skip_chance = 0.5 if is_polyphonic else 0.8
-                if random.random() < skip_chance:
-                    continue
-
-            # Fix #3: Intro Density Check override
-            if current_intro_factor < 0.5 and random.random() > current_intro_factor:
-                continue
-
-            if random.random() < threshold:
-                inst = self.instruments[inst_name]
-                vol = 0.2 + (intensite / 200.0)
-                vol = self.humaniser(vol, 0.15)
-
-                # Fix #4: Apply Dynamic Expression
-                vol = vol * current_dyn
-
-                # Fix #3: Apply Intro Volume Ramp
-                if current_intro_factor < 1.0:
-                    vol = vol * current_intro_factor
-
-                # Pitch logic
-                pitch = self.note_courante + target_data.get("pitch_offset", 0)
-
-                # Fix #2: "piccolo" restauré dans la liste pitch-up
-                if inst_name in ["contrebasse", "basse", "violoncelle", "timbales", "cuivres", "batterie"]:
-                    pitch -= 12
-                if inst_name in ["flute", "violon", "piccolo", "hautbois", "trompette"]:
-                    pitch += 12
-
-                # Clamping émotionnel
-                min_p = target_data.get("min_pitch", 0)
-                max_p = target_data.get("max_pitch", 127)
-                while pitch < min_p:
-                    pitch += 12
-                while pitch > max_p:
-                    pitch -= 12
-
-                if inst_name == "batterie":
-                    pitch = random.choice([35, 38, 42, 46])
-
-                # Sustain / Durée
-                rhythm_duration = attente
-                sound_duration = attente
-
-                if is_polyphonic:
-                    sound_duration = rhythm_duration * random.uniform(3.0, 6.0)
-                    config.COOLDOWNS[inst_name] = current_time + rhythm_duration
-                else:
-                    duration_mult = random.uniform(2.5, 8.0)
-                    sound_duration = rhythm_duration * duration_mult
-                    config.COOLDOWNS[inst_name] = current_time + (sound_duration * 0.95)
-
-                # Anti-mud check
-                active_notes = config.ACTIVE_NOTES.get(inst_name, {})
-                if pitch in active_notes and active_notes[pitch] > current_time:
-                    if random.random() < 0.8:
-                        continue
-
-                active_notes[pitch] = current_time + sound_duration
-                config.ACTIVE_NOTES[inst_name] = active_notes
-                config.ACTIVE_NOTES[inst_name] = {k: v for k, v in active_notes.items() if v > current_time}
-
-                # Envelope fluide
-                final_vol = vol
-                if sound_duration > 1.5:
-                    peak_vol = min(1.0, vol * 1.3)
-                    end_vol = 0.0 if not is_polyphonic else vol * 0.2
-                    try:
-                        final_vol = Envelope.from_levels(
-                            [vol * 0.1, peak_vol, end_vol],
-                            [sound_duration * 0.4, sound_duration * 0.6],
-                            curve_shapes=[3, -3]  # type: ignore[call-arg]
-                        )
-                    except:
-                        final_vol = vol
-
-                inst.play_note(pitch, final_vol, sound_duration, blocking=False)
-
-        # Fix #9: Orchestra mode garde wait(attente) complet comme l'original
-        wait(attente)
-
-    def _apply_auto_drift(self, target_data):
-        """Applique l'auto-drift des paramètres."""
-        curr_time = time.time()
-        start_time = config.ETAT.get("auto_start_time", 0)
-        intro_duration = 12.0
-
-        # Intro progressive
-        if curr_time - start_time < intro_duration:
-            factor = (curr_time - start_time) / intro_duration
-            target_i = target_data.get("intensite", 50)
-            config.ETAT["intensite"] = max(10, target_i * factor)
-
-        # BPM micro-drift
-        current_bpm = config.ETAT.get("bpm", 120)
-        base_target_bpm = target_data.get("bpm", 120)
-
-        if "bpm_micro_drift" not in config.ETAT:
-            config.ETAT["bpm_micro_drift"] = 0
-            config.ETAT["last_drift_update"] = 0
-
-        if curr_time - config.ETAT.get("last_drift_update", 0) > random.randint(10, 20):
-            offset = random.randint(-15, 15)
-            config.ETAT["bpm_micro_drift"] = offset
-            config.ETAT["last_drift_update"] = curr_time
-
-        target_bpm = base_target_bpm + config.ETAT["bpm_micro_drift"]
-
-        if abs(current_bpm - target_bpm) > 0.5:
-            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.05
-
-        # Intensité drift
-        current_i = config.ETAT["intensite"]
-        target_i = target_data.get("intensite", 50)
-
-        if curr_time - start_time >= intro_duration:
-            if abs(current_i - target_i) > 1:
-                config.ETAT["intensite"] += (target_i - current_i) * 0.02
-
-        # Gestion dynamique des instruments
-        if curr_time - config.ETAT.get("last_inst_update", 0) > 4.0:
-            config.ETAT["last_inst_update"] = curr_time
-
-            actifs = config.ETAT.get("instruments_actifs", [])
-            preferred = target_data.get("preferred", [])
-
-            # Ajouter instrument
-            should_add = False
-            if len(actifs) < 2:
-                should_add = True
-            elif len(actifs) < 5 and random.random() < 0.3:
-                should_add = True
-            elif random.random() < 0.1:
-                should_add = True
-
-            if should_add:
-                candidates = [i for i in preferred if i not in actifs]
-                if not candidates and random.random() < 0.2:
-                    candidates = [i for i in self.instruments.keys() if i not in actifs]
-
-                if candidates:
-                    new_inst = random.choice(candidates)
-                    actifs.append(new_inst)
-                    config.ETAT["instruments_actifs"] = actifs
-                    config.ETAT["ui_needs_update"] = True
-
-            # Retirer instrument
-            should_remove = False
-            if len(actifs) > 8:
-                should_remove = True
-            elif len(actifs) > 5 and random.random() < 0.2:
-                should_remove = True
-            elif len(actifs) > 2 and random.random() < 0.05:
-                should_remove = True
-
-            if should_remove:
-                non_pref = [i for i in actifs if i not in preferred]
-                if non_pref:
-                    bye = random.choice(non_pref)
-                else:
-                    bye = random.choice(actifs)
-
-                actifs.remove(bye)
-                config.ETAT["instruments_actifs"] = actifs
-                config.ETAT["ui_needs_update"] = True
+        pitch = note_brute + target_data.get("pitch_offset", 0)
+        min_p = target_data.get("min_pitch", 0)
+        max_p = target_data.get("max_pitch", 127)
+        while pitch < min_p:
+            pitch += 12
+        while pitch > max_p:
+            pitch -= 12
+        return pitch

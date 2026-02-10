@@ -1,5 +1,5 @@
 # Quoniam - Générateur audio procédural
-# Requirements v15.0
+# Requirements v18.0
 
 # Interface graphique
 flet>=0.10.0
@@ -9,3 +9,5 @@ scamp>=0.9.0
 
 # Lecture audio (ambiances)
 pygame>=2.5.0
+
+# AI Conductor (Perlin noise implemented inline, no external dep)
