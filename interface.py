@@ -623,11 +623,18 @@ def main(page: ft.Page):
     lbl_bpm = ft.Text("120 BPM", size=14, weight=ft.FontWeight.BOLD) # v11.0: Global for Auto-Drift Sync
     switch_auto = ft.Switch(value=False, active_color="#00E5FF")
     
-    btn_play_content = ft.Text("▶  PLAY", color="white", weight=ft.FontWeight.BOLD)
+    btn_play_content = ft.Row(
+        [get_ui_icon(assets.SVG_PLAY, color="white", size=18), ft.Text("PLAY", color="white", weight=ft.FontWeight.BOLD)],
+        spacing=8, alignment=ft.MainAxisAlignment.CENTER
+    )
     btn_play_container = ft.Container(
         content=btn_play_content, padding=15, border_radius=30, 
         alignment=ft.Alignment(0, 0), width=200, ink=True,
-        gradient=ft.LinearGradient(colors=["#56ab2f", "#a8e063"]) 
+        # Liquid Glass Style
+        bgcolor=ft.Colors.with_opacity(0.15, "white"),
+        border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
+        blur=ft.Blur(15, 15),
+        shadow=ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.3, "#56ab2f")),
     )
 
     container_presets = ft.Container()
@@ -670,7 +677,7 @@ def main(page: ft.Page):
 
     focus_exit_hint = ft.Container(
         content=ft.Row([
-            ft.Text("\U0001F441", size=14),
+            get_ui_icon(assets.SVG_EYE, color="#88ffffff", size=14),
             ft.Text("EXIT FOCUS", size=10, weight=ft.FontWeight.BOLD,
                      color="#88ffffff")
         ], spacing=5),
@@ -800,11 +807,17 @@ def main(page: ft.Page):
             icon_display.content = new_icon
             
         if config.ETAT["actif"]:
-            btn_play_content.value = "⏸  PAUSE"
-            btn_play_container.gradient = ft.LinearGradient(colors=["#ff416c", "#ff4b2b"])
+            btn_play_content.controls = [
+                get_ui_icon(assets.SVG_PAUSE, color="white", size=18),
+                ft.Text("PAUSE", color="white", weight=ft.FontWeight.BOLD)
+            ]
+            btn_play_container.shadow = ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.4, "#ff416c"))
         else:
-            btn_play_content.value = "▶  PLAY"
-            btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
+            btn_play_content.controls = [
+                get_ui_icon(assets.SVG_PLAY, color="white", size=18),
+                ft.Text("PLAY", color="white", weight=ft.FontWeight.BOLD)
+            ]
+            btn_play_container.shadow = ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.3, "#56ab2f"))
             
         switch_auto.value = config.ETAT["mode_auto"]
         
@@ -853,10 +866,11 @@ def main(page: ft.Page):
                  # Better: re-use the mapping keys from get_asset logic if possible, or just checking if data is not None
                  # Let's simple check if data is not None and matches our known keys
                  instruments_mapping = [
-                     "violon", "violoncelle", "contrebasse", "guitare", "basse", "harpe",
-                     "flute", "clarinette", "hautbois", "trompette", "cor", "cuivres",
-                     "piano", "orgue", "timbales", "batterie",
-                     "choir", "voice", "celesta", "bells", "pizzicato"
+                     "violon", "alto", "violoncelle", "contrebasse", "guitare", "basse", "harpe", "pizzicato",
+                     "flute", "piccolo", "clarinette", "hautbois", "basson", "trompette", "cor", "cuivres",
+                     "piano", "orgue", "clavecin", "accordeon",
+                     "timbales", "batterie", "xylophone", "glockenspiel",
+                     "choir", "voice", "celesta", "bells"
                  ]
                  
                  update_recursive(main_col.controls)
@@ -1049,6 +1063,30 @@ def main(page: ft.Page):
             carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
             carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink"),
         ]
+        def quitter_app(e):
+            """Cleanly shut down audio engine and close the app."""
+            try:
+                config.ETAT["actif"] = False
+                audio_engine.stop()
+            except Exception:
+                pass
+            page.window.close()
+            os._exit(0)
+
+        btn_quit = ft.Container(
+            content=ft.Row([
+                get_ui_icon(assets.SVG_POWER, color="#ff6b6b", size=16),
+                ft.Text("QUIT", size=12, weight=ft.FontWeight.BOLD, color="#ff6b6b")
+            ], spacing=8, alignment=ft.MainAxisAlignment.CENTER),
+            padding=ft.Padding(left=20, top=10, right=20, bottom=10),
+            border_radius=25,
+            bgcolor=ft.Colors.with_opacity(0.1, "white"),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.15, "#ff6b6b")),
+            blur=ft.Blur(10, 10),
+            ink=True,
+            on_click=quitter_app,
+            tooltip="Quit Application"
+        )
 
         return ft.Column([
             ft.Container(height=40),
@@ -1066,8 +1104,13 @@ def main(page: ft.Page):
             ft.Row(controls=liste_cartes_ambiance, alignment=ft.MainAxisAlignment.CENTER, wrap=True, spacing=10),
 
             ft.Container(expand=True),
-            ft.Text("v17.0 Kaleidoscope", size=10, color="#44ffffff")
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+            ft.Row([
+                ft.Text("v17.0 Kaleidoscope", size=10, color="#44ffffff"),
+                ft.Container(width=15),
+                btn_quit,
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=5),
+            ft.Container(height=15),
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def creer_presets_pills():
         """Compact pill-style preset row for current collection."""
@@ -1142,7 +1185,10 @@ def main(page: ft.Page):
 
     def creer_contenu_controle():
         bouton_retour = ft.Container(
-            content=ft.Text("⬅️  BACK", size=12, weight=ft.FontWeight.BOLD, color="white"),
+            content=ft.Row([
+                get_ui_icon(assets.SVG_ARROW_LEFT, color="white", size=16),
+                ft.Text("BACK", size=12, weight=ft.FontWeight.BOLD, color="white")
+            ], spacing=5),
             padding=10, border_radius=10, ink=True, on_click=retour_accueil
         )
 
@@ -1243,7 +1289,7 @@ def main(page: ft.Page):
 
                 ft.Container(width=5),
                 ft.Container(
-                    content=ft.Text("\U0001F441", size=16),
+                    content=get_ui_icon(assets.SVG_EYE, color="white", size=18),
                     on_click=toggle_focus,
                     tooltip="Focus Mode",
                     padding=5,
@@ -1281,11 +1327,12 @@ def main(page: ft.Page):
             header_nav,
             creer_presets_pills(),
             centre,
-            creer_panneau_sliders(),
-            ft.Container(height=5),
-            btn_play_container,
             ft.Container(height=10),
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
+            btn_play_container,
+            ft.Container(height=5),
+            creer_panneau_sliders(),
+            ft.Container(height=10),
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO, expand=True)
 
 
     def changer_preset(e):
@@ -1435,18 +1482,22 @@ def main(page: ft.Page):
         def get_asset(code):
             mapping = {
                 # STRINGS
-                "violon": assets.SVG_VIOLIN, "violoncelle": assets.SVG_CELLO, "contrebasse": assets.SVG_CONTRABASS,
-                "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS, "harpe": assets.SVG_HARP,
-                # WINDS
-                "flute": assets.SVG_FLUTE, "clarinette": assets.SVG_CLARINET, 
-                "hautbois": assets.SVG_OBOE, "trompette": assets.SVG_TRUMPET, "cor": assets.SVG_HORN, "cuivres": assets.SVG_TRUMPET, # Fallback
+                "violon": assets.SVG_VIOLIN, "alto": assets.SVG_VIOLA, "violoncelle": assets.SVG_CELLO,
+                "contrebasse": assets.SVG_CONTRABASS, "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS,
+                "harpe": assets.SVG_HARP, "pizzicato": assets.SVG_PIZZICATO,
+                # WINDS & BRASS
+                "flute": assets.SVG_FLUTE, "piccolo": assets.SVG_PICCOLO, "clarinette": assets.SVG_CLARINET,
+                "hautbois": assets.SVG_OBOE, "basson": assets.SVG_BASSOON,
+                "trompette": assets.SVG_TRUMPET, "cor": assets.SVG_HORN, "cuivres": assets.SVG_TRUMPET,
                 # KEYS
                 "piano": assets.SVG_PIANO, "orgue": assets.SVG_ORGAN,
+                "clavecin": assets.SVG_HARPSICHORD, "accordeon": assets.SVG_ACCORDION,
                 # PERCUSSION
                 "timbales": assets.SVG_DRUM, "batterie": assets.SVG_DRUM,
-                # v10.6 ETHEREAL & VOICES
+                "xylophone": assets.SVG_XYLOPHONE, "glockenspiel": assets.SVG_GLOCKENSPIEL,
+                # ETHEREAL & VOICES
                 "choir": assets.SVG_CHOIR, "voice": assets.SVG_VOICE, "celesta": assets.SVG_CELESTA,
-                "bells": assets.SVG_BELLS, "pizzicato": assets.SVG_PIZZICATO
+                "bells": assets.SVG_BELLS,
             }
             return mapping.get(code, assets.SVG_NOTE)
 
@@ -1775,39 +1826,42 @@ def main(page: ft.Page):
 
         return ft.Column([
             ft.Text("ORCHESTRA", size=18, weight=ft.FontWeight.BOLD, color="white"),
-            # ft.Row([txt_emotion], alignment=ft.MainAxisAlignment.CENTER), # Removed as requested
             ft.Container(height=5),
             
-            # STRINGS SECTIONS
-            section("STRINGS", [("Violin", "violon"), ("Cello", "violoncelle"), ("Bass", "contrebasse"), ("Harp", "harpe"), ("Guitar", "guitare")]),
+            # STRINGS
+            section("STRINGS", [
+                ("Violin", "violon"), ("Viola", "alto"), ("Cello", "violoncelle"),
+                ("Contrabass", "contrebasse"), ("Harp", "harpe"), ("Guitar", "guitare"),
+                ("Pizzicato", "pizzicato"),
+            ]),
             ft.Divider(color="#22ffffff"),
             
-            # WINDS SECTION
-            section("WINDS & BRASS", [("Flute", "flute"), ("Clarinet", "clarinette"), ("Oboe", "hautbois"), ("Horn", "cor"), ("Brass", "cuivres")]),
+            # WINDS & BRASS
+            section("WINDS & BRASS", [
+                ("Flute", "flute"), ("Piccolo", "piccolo"), ("Clarinet", "clarinette"),
+                ("Oboe", "hautbois"), ("Bassoon", "basson"),
+                ("Trumpet", "trompette"), ("Horn", "cor"), ("Brass", "cuivres"),
+            ]),
             ft.Divider(color="#22ffffff"),
             
-            # KEYS & PERCUSSION SECTION (Mixed Row)
-            ft.Row([
-                ft.Column([
-                    ft.Text("KEYS", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
-                    ft.Row([btn_inst("Piano", "piano"), btn_inst("Organ", "orgue")], spacing=5)
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                ft.Container(width=10),
-                ft.Column([
-                    ft.Text("PERCUSSION", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
-                    ft.Row([btn_inst("Timpani", "timbales"), btn_inst("Drums", "batterie")], spacing=5)
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
-            ], alignment=ft.MainAxisAlignment.CENTER),
-            
+            # KEYS
+            section("KEYS", [
+                ("Piano", "piano"), ("Organ", "orgue"),
+                ("Harpsichord", "clavecin"), ("Accordion", "accordeon"),
+            ]),
             ft.Divider(color="#22ffffff"),
             
-            # v10.6 ETHEREAL & VOICES SECTION
+            # PERCUSSION
+            section("PERCUSSION", [
+                ("Timpani", "timbales"), ("Drums", "batterie"),
+                ("Xylophone", "xylophone"), ("Glockenspiel", "glockenspiel"),
+            ]),
+            ft.Divider(color="#22ffffff"),
+            
+            # ETHEREAL & VOICES
             section("ETHEREAL & VOICES", [
-                ("Choir", "choir"), 
-                ("Voice", "voice"), 
-                ("Celesta", "celesta"), 
-                ("Bells", "bells"), 
-                ("Pizzicato", "pizzicato")
+                ("Choir", "choir"), ("Voice", "voice"),
+                ("Celesta", "celesta"), ("Bells", "bells"),
             ]),
 
             ft.Container(height=10),
@@ -2002,4 +2056,4 @@ if __name__ == "__main__":
     audio_engine = QuoniamAudioEngine()
     audio_engine.start()
 
-    ft.run(main)
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER)

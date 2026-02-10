@@ -1,4 +1,4 @@
-# audio_engine.py - MOTEUR AUDIO SCAMP REFACTORISÉ v15.0
+# audio_engine.py - MOTEUR AUDIO SCAMP REFACTORISÉ v19.1
 """
 Moteur audio procédural basé sur SCAMP.
 Génère des nappes fluides avec enveloppes dynamiques et tuilage.
@@ -10,7 +10,7 @@ import os
 import time
 import threading
 from gammes import TOUTES_GAMMES
-from ai_conductor import AIConductor
+from ai_conductor import AIConductor, SUSTAINED_INSTRUMENTS, CONTINUUM_INSTRUMENTS, PLUCKED_INSTRUMENTS, PERCUSSIVE_INSTRUMENTS
 import config
 
 
@@ -69,55 +69,73 @@ class QuoniamAudioEngine:
 
     def _load_instruments(self):
         """Charge tous les instruments SCAMP avec effets (reverb, chorus)."""
+        print("⏳ Loading instruments...")
         try:
             self.fond_sonore = self._get_part("Pad 2 (warm)")
 
-            self.instruments = {
-                # Éléments
-                "eau": self._get_part("Marimba"),
-                "air": self._get_part("Electric Piano 1"),
-                "feu": self._get_part("Acoustic Guitar (nylon)"),
-                "terre": self._get_part("Cello"),
-                "espace": self._get_part("Pad 7 (halo)"),
-                # Saisons
-                "hiver": self._get_part("Celesta"),
-                "printemps": self._get_part("Kalimba"),
-                "ete": self._get_part("Steel Drums"),
-                "automne": self._get_part("Shakuhachi"),
-                "vide": self._get_part("Pad 3 (polysynth)"),
-                # Atmosphères
-                "zen": self._get_part("Sitar"),
-                "cyber": self._get_part("Lead 2 (sawtooth)"),
-                "lofi": self._get_part("Electric Piano 2"),
-                "jungle": self._get_part("Pan Flute"),
-                "indus": self._get_part("Tubular Bells"),
-                # Orchestre
-                "piano": self._get_part("Acoustic Grand Piano"),
-                "violon": self._get_part("Violin"),
-                "violoncelle": self._get_part("Cello"),
-                "contrebasse": self._get_part("Contrabass"),
-                "guitare": self._get_part("Acoustic Guitar (steel)"),
-                "basse": self._get_part("Acoustic Bass"),
-                "harpe": self._get_part("Orchestral Harp"),
-                "flute": self._get_part("Flute"),
-                "clarinette": self._get_part("Clarinet"),
-                "hautbois": self._get_part("Oboe"),
-                "cor": self._get_part("French Horn"),
-                "cuivres": self._get_part("Brass Section"),
-                "orgue": self._get_part("Church Organ"),
-                "timbales": self._get_part("Timpani"),
-                "batterie": self._get_part("Orchestral Kit"),
-                # Éthéré & Voix
-                "choir": self._get_part("Choir Aahs"),
-                "voice": self._get_part("Voice Oohs"),
-                "celesta": self._get_part("Celesta"),
-                "bells": self._get_part("Tubular Bells"),
-                "pizzicato": self._get_part("Pizzicato Strings")
-            }
+            # Helper to safely add instruments
+            def add(key, preset):
+                p = self._get_part(preset)
+                if p: self.instruments[key] = p
 
-            self.instruments = {k: v for k, v in self.instruments.items() if v is not None}
+            # Éléments
+            add("eau", "Marimba")
+            add("air", "Electric Piano 1")
+            add("feu", "Acoustic Guitar (nylon)")
+            add("terre", "Cello")
+            add("espace", "Pad 7 (halo)")
+            
+            # Saisons
+            add("hiver", "Celesta")
+            add("printemps", "Kalimba")
+            add("ete", "Steel Drums")
+            add("automne", "Shakuhachi")
+            add("vide", "Pad 3 (polysynth)")
+            
+            # Atmosphères
+            add("zen", "Sitar")
+            add("cyber", "Lead 2 (sawtooth)")
+            add("lofi", "Electric Piano 2")
+            add("jungle", "Pan Flute")
+            add("indus", "Tubular Bells")
+
+            # Orchestre - STRINGS
+            add("violon", "Violin")
+            add("alto", "Viola")
+            add("violoncelle", "Cello")
+            add("contrebasse", "Contrabass")
+            add("guitare", "Acoustic Guitar (steel)")
+            add("basse", "Acoustic Bass")
+            add("harpe", "Orchestral Harp")
+            add("pizzicato", "Pizzicato Strings")
+
+            # Orchestre - WINDS
+            add("flute", "Flute")
+            add("piccolo", "Piccolo")
+            add("clarinette", "Clarinet")
+            add("hautbois", "Oboe")
+            add("basson", "Bassoon")
+            add("cor", "French Horn")
+            add("trompette", "Trumpet")
+            add("cuivres", "Brass Section")
+
+            # Orchestre - KEYS & PERC
+            add("piano", "Acoustic Grand Piano")
+            add("orgue", "Church Organ")
+            add("clavecin", "Harpsichord")
+            add("accordeon", "Accordion")
+            add("timbales", "Timpani")
+            add("batterie", "Orchestral Kit")
+            add("xylophone", "Xylophone")
+            add("glockenspiel", "Glockenspiel")
+
+            # Orchestre - ETHEREAL
+            add("choir", "Choir Aahs")
+            add("voice", "Voice Oohs")
+            add("celesta", "Celesta")
+            add("bells", "Tubular Bells")
+
             print(f"✅ Loaded {len(self.parts_cache)} unique parts for {len(self.instruments)} instruments.")
-
             self._apply_effects()
 
         except Exception as e:
@@ -363,7 +381,10 @@ class QuoniamAudioEngine:
             wait(attente)
 
     def _play_orchestra_mode(self):
-        """Gère la lecture en mode orchestre avec AI Conductor."""
+        """
+        Gère la lecture en mode orchestre avec AI Conductor v19.0.
+        ORGANIC SOUL & PHRASING + CONTINUUM MÉLODIQUE
+        """
         actifs = config.ETAT.get("instruments_actifs", [])
         if not actifs:
             wait(0.5)
@@ -405,93 +426,98 @@ class QuoniamAudioEngine:
         if config.ETAT.get("mode_auto", False):
             self.conductor.update(attente, target_data)
 
+        intensite = config.ETAT.get("intensite", 50)
         current_time = time.time()
 
-        for inst_name in actifs:
+        for inst_name in list(actifs):
             if inst_name not in self.instruments:
                 continue
             if inst_name in target_data.get("excluded", []):
                 continue
 
-            # Conductor decides if this instrument plays
-            if config.ETAT.get("mode_auto", False):
-                if not self.conductor.should_play(inst_name, target_data):
-                    continue
-            else:
-                # Legacy threshold when auto is off
-                threshold = 0.9 if inst_name in target_data.get("preferred", []) else 0.7
-                if random.random() > threshold:
-                    continue
-
-            # Cooldown check
-            is_polyphonic = inst_name in self.conductor.POLYPHONIC
-            last_end = config.COOLDOWNS.get(inst_name, 0)
-            if not is_polyphonic:
-                if current_time < last_end - 0.1:
-                    continue
-
-            # Density limit
-            if len(actifs) > 8:
-                skip_chance = 0.5 if is_polyphonic else 0.8
-                if random.random() < skip_chance:
-                    continue
-
             inst = self.instruments[inst_name]
 
-            # ── Pitch: voice leading + tessitura ──
-            if inst_name == "batterie":
-                pitch = random.choice([35, 38, 42, 46])
-            elif config.ETAT.get("mode_auto", False):
-                pitch = self.conductor.voice_lead(inst_name, gamme)
-            else:
-                pitch = self._legacy_note_select(gamme, target_data)
+            # ── PHRASING STATE LOGIC ──
+            # Sustained instruments: check if we should start/continue a phrase
+            is_sustained = inst_name in SUSTAINED_INSTRUMENTS
+            is_plucked = inst_name in PLUCKED_INSTRUMENTS and inst_name not in SUSTAINED_INSTRUMENTS
+            is_percussive = inst_name in PERCUSSIVE_INSTRUMENTS and inst_name not in PLUCKED_INSTRUMENTS
 
-            # ── Velocity: Gaussian humanization ──
-            base_vol = 0.2 + (config.ETAT["intensite"] / 200.0)
-            current_dyn = config.INST_DYNAMICS.get(inst_name, 1.0)
-            if random.random() < 0.1:
-                drift = random.uniform(-0.05, 0.05)
-                current_dyn = max(0.4, min(1.3, current_dyn + drift))
-                config.INST_DYNAMICS[inst_name] = current_dyn
-            vol = self.conductor.humanize_velocity(base_vol * current_dyn)
+            in_phrase = self.conductor.is_in_phrase(inst_name)
 
-            # ── Duration: density-aware ──
-            if config.ETAT.get("mode_auto", False):
-                sound_duration = self.conductor.suggest_duration(inst_name, attente)
-            else:
-                mult = random.uniform(3.0, 6.0) if is_polyphonic else random.uniform(2.5, 8.0)
-                sound_duration = attente * mult
-
-            # Cooldown
-            if is_polyphonic:
-                config.COOLDOWNS[inst_name] = current_time + attente
-            else:
-                config.COOLDOWNS[inst_name] = current_time + (sound_duration * 0.95)
-
-            # Anti-mud check
-            active_notes = config.ACTIVE_NOTES.get(inst_name, {})
-            if pitch in active_notes and active_notes[pitch] > current_time:
-                if random.random() < 0.8:
+            if is_sustained and not in_phrase:
+                # Not in a phrase: should we start one?
+                # CONTINUUM RULE: should_start_phrase is almost always True for continuum instruments
+                if self.conductor.should_start_phrase(inst_name):
+                    self.conductor.begin_phrase(inst_name)
+                    in_phrase = True
+                else:
+                    # Still breathing or random pause
+                    continue
+            elif not is_sustained:
+                # Non-sustained: use probability-based play logic
+                if not self.conductor.should_play(inst_name, target_data):
                     continue
 
+            # ── COOLDOWN CHECK ──
+            last_end = config.COOLDOWNS.get(inst_name, 0)
+            if is_sustained and in_phrase:
+                # Legato: allow heavy overlap (next note starts before prev ends)
+                # Only skip if we're very early in the current note
+                if current_time < last_end - 1.0:
+                    continue  # Still too early, wait for overlap window
+            elif not is_sustained:
+                if current_time < last_end:
+                    continue  # Instrument busy
+
+            # ── PITCH (Voice Leading via Conductor) ──
+            if inst_name == "batterie":
+                pitch = random.choice([35, 38, 42, 46, 49])
+            else:
+                pitch = self.conductor.voice_lead(inst_name, gamme)
+
+            # ── DURATION (Conductor-driven) ──
+            # PASSING LOOP_WAIT (attente) IS CRITICAL FOR CONTINUUM RULE
+            sound_duration = self.conductor.suggest_duration(inst_name, attente, loop_wait=attente)
+
+            # ── COOLDOWN UPDATE ──
+            if is_sustained and in_phrase:
+                # Legato overlap: next note available at 60-90% of duration
+                legato_wait = self.conductor.get_legato_wait(inst_name, sound_duration)
+                config.COOLDOWNS[inst_name] = current_time + legato_wait
+            elif inst_name in PLUCKED_INSTRUMENTS:
+                config.COOLDOWNS[inst_name] = current_time + sound_duration * 0.9
+            else:
+                config.COOLDOWNS[inst_name] = current_time + sound_duration
+
+            # ── ANTI-MUD (don't repeat ringing pitch) ──
+            active_notes = config.ACTIVE_NOTES.get(inst_name, {})
+            if pitch in active_notes and active_notes[pitch] > current_time:
+                # Allow repeat for percussive sometimes
+                if not is_percussive and random.random() < 0.7:
+                    continue
             active_notes[pitch] = current_time + sound_duration
             config.ACTIVE_NOTES[inst_name] = {k: v for k, v in active_notes.items() if v > current_time}
 
-            # Envelope fluide
-            final_vol = vol
-            if sound_duration > 1.5:
-                peak_vol = min(1.0, vol * 1.3)
-                end_vol = 0.0 if not is_polyphonic else vol * 0.2
-                try:
-                    final_vol = Envelope.from_levels(
-                        [vol * 0.1, peak_vol, end_vol],
-                        [sound_duration * 0.4, sound_duration * 0.6],
-                        curve_shapes=[3, -3]  # type: ignore[call-arg]
-                    )
-                except:
-                    final_vol = vol
+            # ── VOLUME ──
+            vol = 0.15 + (intensite / 250.0)
+            vol = self.conductor.humanize_velocity(vol, 0.06)
+            vol = min(1.0, max(0.05, vol))
 
-            inst.play_note(pitch, final_vol, sound_duration, blocking=False)
+            # ── SMART ENVELOPE (per instrument family) ──
+            final_vol = self.conductor.get_smart_envelope(inst_name, vol, sound_duration)
+
+            # ── PLAY NOTE ──
+            try:
+                inst.play_note(pitch, final_vol, sound_duration, blocking=False)
+                # Count note for phrasing logic
+                state = self.conductor.get_phrase_state(inst_name)
+                state["notes_played"] += 1
+            except Exception:
+                pass
+
+            # End phrase if time is up
+            self.conductor.end_phrase_if_done(inst_name)
 
         wait(attente)
 
