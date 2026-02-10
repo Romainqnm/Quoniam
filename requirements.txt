@@ -1,0 +1,11 @@
+# Quoniam - Générateur audio procédural
+# Requirements v15.0
+
+# Interface graphique
+flet>=0.10.0
+
+# Moteur audio MIDI
+scamp>=0.9.0
+
+# Lecture audio (ambiances)
+pygame>=2.5.0
