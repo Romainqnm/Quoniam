@@ -1069,6 +1069,77 @@ def main(page: ft.Page):
             ft.Text("v17.0 Kaleidoscope", size=10, color="#44ffffff")
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
+    def creer_presets_pills():
+        """Compact pill-style preset row for current collection."""
+        coll = config.ETAT.get("collection")
+        SVG_MAP = {
+            "earth": assets.SVG_EARTH, "water": assets.SVG_WATER, "fire": assets.SVG_FIRE,
+            "air": assets.SVG_AIR, "space": assets.SVG_SPACE,
+            "winter": assets.SVG_WINTER, "spring": assets.SVG_SPRING, "summer": assets.SVG_SUMMER,
+            "autumn": assets.SVG_AUTUMN, "void": assets.SVG_VOID,
+            "zen": assets.SVG_ZEN, "cyber": assets.SVG_CYBER, "lofi": assets.SVG_LOFI,
+            "jungle": assets.SVG_JUNGLE, "indus": assets.SVG_INDUS,
+        }
+
+        def pill(icon_key, label, code, c1):
+            svg = SVG_MAP.get(icon_key, assets.SVG_NOTE)
+            b64 = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+            is_active = config.ETAT.get("preset") == code
+            return ft.Container(
+                content=ft.Row([
+                    ft.Image(src=f"data:image/svg+xml;base64,{b64}",
+                             width=18, height=18, color=c1, fit=ft.BoxFit.CONTAIN),
+                    ft.Text(label, size=9, weight=ft.FontWeight.BOLD,
+                            color="white" if is_active else "#aaffffff"),
+                ], spacing=4, alignment=ft.MainAxisAlignment.CENTER),
+                data=code,
+                on_click=lambda e, c=code: [changer_preset(e), update_central_icon_for_preset(c)],
+                height=34, padding=ft.Padding(left=10, top=4, right=10, bottom=4),
+                border_radius=17,
+                bgcolor=ft.Colors.with_opacity(0.35, c1) if is_active
+                        else ft.Colors.with_opacity(0.12, "white"),
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.4 if is_active else 0.15, "white")),
+                ink=True, tooltip=label,
+                animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+            )
+
+        if coll == "elements":
+            pills: list = [
+                pill("earth", "Earth", "terre", "#4caf50"),
+                pill("water", "Water", "eau", "#00bcd4"),
+                pill("fire", "Fire", "feu", "#ff5722"),
+                pill("air", "Air", "air", "#b0bec5"),
+                pill("space", "Space", "espace", "#673ab7"),
+            ]
+        elif coll == "saisons":
+            pills = [
+                pill("winter", "Winter", "hiver", "#81d4fa"),
+                pill("spring", "Spring", "printemps", "#f48fb1"),
+                pill("summer", "Summer", "ete", "#ff9800"),
+                pill("autumn", "Autumn", "automne", "#a1887f"),
+                pill("void", "Void", "vide", "#7b1fa2"),
+            ]
+        elif coll == "instruments":
+            return ft.Container(height=0)
+        else:  # atmos
+            pills = [
+                pill("zen", "Zen", "zen", "#81c784"),
+                pill("cyber", "Cyber", "cyber", "#00e676"),
+                pill("lofi", "LoFi", "lofi", "#d7ccc8"),
+                pill("jungle", "Thunder", "jungle", "#455a64"),
+                pill("indus", "Traffic", "indus", "#546e7a"),
+            ]
+
+        return ft.Container(
+            content=ft.Row(pills, alignment=ft.MainAxisAlignment.CENTER,
+                           spacing=6, wrap=True),
+            bgcolor=ft.Colors.with_opacity(0.3, "black"),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+            border_radius=16, padding=8,
+            blur=ft.Blur(10, 10),
+            margin=ft.Margin(left=10, top=5, right=10, bottom=0),
+        )
+
     def creer_contenu_controle():
         bouton_retour = ft.Container(
             content=ft.Text("⬅️  BACK", size=12, weight=ft.FontWeight.BOLD, color="white"),
@@ -1191,29 +1262,29 @@ def main(page: ft.Page):
             margin=ft.Margin(left=10, top=0, right=10, bottom=0)
         )
 
-        return ft.Column([
-            ft.Container(height=10),
-            header_nav,
-            ft.Container(height=10),
-            container_icone, 
-            creer_separateur_neon("#D500F9" if config.ETAT["collection"] == "atmos" else "#00E5FF"),
-            
-            # CONTRASTED CONTAINER FOR PRESETS
-            ft.Container(
+        # Orchestra mode: show instrument rack in glassmorphism container
+        if config.ETAT.get("collection") == "instruments":
+            centre = ft.Container(
                 content=container_presets,
-                bgcolor=ft.Colors.with_opacity(0.4, "black"), # Darker background for contrast
+                bgcolor=ft.Colors.with_opacity(0.4, "black"),
                 border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
                 border_radius=20,
-                padding=20,
+                padding=15,
                 blur=ft.Blur(10, 10),
-                margin=ft.Margin(left=20, top=0, right=20, bottom=0)
-            ),
-            
-            creer_separateur_neon("#D500F9" if config.ETAT["collection"] == "atmos" else "#00E5FF"),
+                margin=ft.Margin(left=10, top=5, right=10, bottom=0),
+                expand=True,
+            )
+        else:
+            centre = ft.Container(expand=True)
+
+        return ft.Column([
+            header_nav,
+            creer_presets_pills(),
+            centre,
             creer_panneau_sliders(),
-            ft.Container(expand=True),
+            ft.Container(height=5),
             btn_play_container,
-            ft.Container(height=20),
+            ft.Container(height=10),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.HIDDEN)
 
 
