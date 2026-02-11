@@ -1285,7 +1285,7 @@ def main(page: ft.Page):
             ft.Container(height=5),
             btn_play_container,
             ft.Container(height=10),
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.HIDDEN)
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
 
 
     def changer_preset(e):
