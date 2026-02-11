@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="icone.png" alt="Quoniam Logo" width="120" height="120"/>
+</p>
+
+<p align="center">
   <img src="Intro.png" alt="Quoniam Banner" width="100%"/>
 </p>
 

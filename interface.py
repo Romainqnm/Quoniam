@@ -10,6 +10,12 @@ import assets_library as assets
 import os # v13.0 fix
 import math # v13.3 fix for visualizer
 
+# Optional pygame import for ambient audio playback
+try:
+    import pygame  # type: ignore
+except ImportError:
+    pygame = None  # type: ignore
+
 def main(page: ft.Page):
     # --- CONFIGURATION ---
     page.title = "QUONIAM v1.20"
@@ -709,15 +715,16 @@ def main(page: ft.Page):
     class GlobalAudioPlayer:
         def __init__(self):
             try:
-                import pygame
-                pygame.mixer.init()
-                pygame.mixer.set_num_channels(8) # Ensure enough channels
-                self.mixer = pygame.mixer
-                
+                if pygame is None:
+                    raise ImportError("pygame not available")
+                pygame.mixer.init()  # type: ignore
+                pygame.mixer.set_num_channels(8)  # type: ignore # Ensure enough channels
+                self.mixer = pygame.mixer  # type: ignore
+
                 # Reserve channels 0 and 1 for ambience crossfading
-                self.chan_a = pygame.mixer.Channel(0)
-                self.chan_b = pygame.mixer.Channel(1)
-                
+                self.chan_a = pygame.mixer.Channel(0)  # type: ignore
+                self.chan_b = pygame.mixer.Channel(1)  # type: ignore
+
                 self.has_pygame = True
                 print("✅ Pygame Audio System Initialized (Dual Channel Mode)")
             except Exception as e:
@@ -1184,7 +1191,7 @@ def main(page: ft.Page):
     def toggle_recording(e):
         if not recording_active[0]:
             # Start recording
-            global_audio.start_recording()
+            audio_engine.start_recording()
             recording_active[0] = True
             btn_record_container.content = get_ui_icon(assets.SVG_STOP, color="white", size=16)
             btn_record_container.bgcolor = "#ff4444"
@@ -1196,7 +1203,7 @@ def main(page: ft.Page):
 
             def update_timer():
                 while recording_active[0]:
-                    elapsed = global_audio.get_recording_duration()
+                    elapsed = audio_engine.get_recording_duration()
                     mins = int(elapsed // 60)
                     secs = int(elapsed % 60)
                     recording_timer_text.value = f"{mins:02d}:{secs:02d}"
@@ -1211,7 +1218,7 @@ def main(page: ft.Page):
         else:
             # Stop recording
             export_dir = config.SETTINGS.get("export_folder", "./recordings")
-            saved_path = global_audio.stop_recording(output_dir=export_dir)
+            saved_path = audio_engine.stop_recording(output_dir=export_dir)
             recording_active[0] = False
 
             btn_record_container.content = get_ui_icon(assets.SVG_RECORD, color="#ff4444", size=16)
@@ -1663,7 +1670,6 @@ def main(page: ft.Page):
                 audio_engine.stop()
             except Exception:
                 pass
-            page.window.close()
             os._exit(0)
 
         btn_quit = ft.Container(
@@ -1698,8 +1704,20 @@ def main(page: ft.Page):
 
         return ft.Column([
             ft.Container(height=40),
+            # App icon - centered above QUONIAM
+            ft.Container(
+                content=ft.Image(
+                    src="/assets/icone.png",
+                    width=120,
+                    height=120,
+                ),
+                width=120,
+                height=120,
+                alignment=ft.Alignment(0, 0),
+            ),
+            ft.Container(height=20),
             creer_header(),
-            ft.Container(height=40),
+            ft.Container(height=30),
 
             # ORCHESTRA SECTION
             ft.Text(config.T("main_stage"), size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
@@ -2679,4 +2697,4 @@ if __name__ == "__main__":
     audio_engine = QuoniamAudioEngine()
     audio_engine.start()
 
-    ft.app(main, view=ft.AppView.WEB_BROWSER)
+    ft.run(main, view=ft.AppView.WEB_BROWSER, assets_dir="assets")
