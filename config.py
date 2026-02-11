@@ -1,4 +1,4 @@
-# config.py - v3.0
+# config.py - v1.20
 ETAT = {
     "actif": True,
     "mode_auto": False,
@@ -127,3 +127,40 @@ EMOTIONS = {
     },
 }
 
+# --- SETTINGS (v1.20) ---
+SETTINGS_DEFAULTS = {
+    "fullscreen": False,
+    "zen_intro": True,
+    "visual_quality": "high",    # "low", "medium", "high"
+    "prevent_sleep": False,      # no-op on web mode
+    "language": "EN",            # "FR"/"EN" -- actual i18n deferred
+    "export_folder": "./recordings",
+}
+
+SETTINGS = dict(SETTINGS_DEFAULTS)
+
+def load_settings_from_storage(page):
+    """Hydrate config.SETTINGS from page.client_storage on startup."""
+    for key, default in SETTINGS_DEFAULTS.items():
+        try:
+            stored = page.client_storage.get(f"quoniam.setting.{key}")
+            SETTINGS[key] = stored if stored is not None else default
+        except Exception:
+            SETTINGS[key] = default
+
+def save_setting(page, key, value):
+    """Save a single setting to runtime dict + persistent storage."""
+    SETTINGS[key] = value
+    try:
+        page.client_storage.set(f"quoniam.setting.{key}", value)
+    except Exception:
+        pass
+
+def reset_all_settings(page):
+    """Reset all settings to defaults and clear storage."""
+    for key, default in SETTINGS_DEFAULTS.items():
+        SETTINGS[key] = default
+        try:
+            page.client_storage.remove(f"quoniam.setting.{key}")
+        except Exception:
+            pass

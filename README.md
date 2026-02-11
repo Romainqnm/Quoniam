@@ -1,4 +1,4 @@
-# 🌊 QUONIAM: Fluid Dynamics Audio Engine (v1.19.2)
+# 🌊 QUONIAM: Fluid Dynamics Audio Engine (v1.20)
 
 > **A procedural audio environment for focus, relaxation, and flow.**
 > *Built with Python, Flet & SCAMP.*
@@ -10,7 +10,7 @@ Quoniam | Audio is a **generative audio engine** that creates infinite, non-repe
 
 ## ✨ Key Features
 
-### 🧠 AI Conductor Engine (v1.19.2 — Organic Soul & Phrasing)
+### 🧠 AI Conductor Engine (v1.20 — Organic Soul & Phrasing)
 The **AI Conductor** replaces the random Auto-Drift system with an intelligent virtual conductor:
 *   **Phrasing State**: Solo instruments enter long, legato phrases (15-40s) with natural note overlapping — no more robotic, isolated notes.
 *   **Smart Envelopes**: Physically accurate sound shaping per instrument family:
@@ -48,7 +48,7 @@ The engine adapts its playing style based on 6 core emotions:
 *   **Action**: Fast rhythms, staccato strings, driving drums
 *   **Créatif**: No rules, pure random exploration
 
-### ✨ Particle System (NEW in v1.19.2)
+### ✨ Particle System (NEW in v1.20)
 Ambient particles float across the visualizer, synced with the music:
 *   **4 Shape Types**: Circles, diamonds, 4-pointed stars, tiny sparkle dots
 *   **Palette-Synced Colors**: Particles inherit the current kaleidoscope theme colors
@@ -56,6 +56,15 @@ Ambient particles float across the visualizer, synced with the music:
 *   **BPM-Synced Pulsation**: Particle sizes breathe with the musical tempo
 *   **Adaptive Density**: 15-27 particles on screen, scaling with audio intensity
 *   **Lifecycle**: Smooth fade-in → float → fade-out (3-5.5s lifespan)
+
+### Settings & Recording (NEW in v1.20)
+*   **Persistent Settings**: Gear icon in header opens a Settings dialog with Immersion and App categories
+*   **Fullscreen Toggle**: Switch to fullscreen mode instantly from settings
+*   **Visual Quality**: Choose between low, medium, and high quality rendering
+*   **Audio Recording**: Record button captures SCAMP performance to MIDI file
+*   **Recording UI**: Red record button with blinking timer, SnackBar save notification on stop
+*   **Export**: Recordings saved to configurable export folder (default: `./recordings/`)
+*   **Settings Persistence**: All settings survive app restarts via `page.client_storage`
 
 ### 🎨 Visual & UI
 *   **Liquid Glass UI**: Modern interface with glassmorphism, compact pill-style presets
@@ -94,16 +103,17 @@ pip install -r requirements.txt
 python interface.py
 ```
 
-## 📦 Project Structure (v1.19.2)
+## 📦 Project Structure (v1.20)
 ```
 Quoniam/
 ├── ai_conductor.py      # AI Conductor (Perlin noise, phrasing, smart envelopes)
-├── audio_engine.py      # SCAMP audio engine (class-based, robust loading)
-├── interface.py         # Flet UI (Liquid Glass, kaleidoscope, particles)
-├── config.py            # Global state & settings
+├── audio_engine.py      # SCAMP audio engine (class-based, recording, robust loading)
+├── interface.py         # Flet UI (Liquid Glass, kaleidoscope, particles, settings, recording)
+├── config.py            # Global state, settings persistence & emotion definitions
 ├── gammes.py            # Musical scales database
 ├── assets_library.py    # SVG icons & visual assets
 ├── main.py              # Standalone engine runner
 ├── requirements.txt     # Dependencies
+├── recordings/          # MIDI recording output (auto-created)
 └── FluidR3_GM.sf2       # SoundFont (not included, download separately)
 ```

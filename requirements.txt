@@ -1,5 +1,5 @@
 # Quoniam - Générateur audio procédural
-# Requirements v18.0
+# Requirements v1.20
 
 # Interface graphique
 flet>=0.10.0

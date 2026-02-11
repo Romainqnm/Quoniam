@@ -1,4 +1,4 @@
-# audio_engine.py - MOTEUR AUDIO SCAMP REFACTORISÉ v1.19.2
+# audio_engine.py - MOTEUR AUDIO SCAMP REFACTORISÉ v1.20
 """
 Moteur audio procédural basé sur SCAMP.
 Génère des nappes fluides avec enveloppes dynamiques et tuilage.
@@ -37,12 +37,17 @@ class QuoniamAudioEngine:
         # AI Conductor
         self.conductor = AIConductor()
 
+        # Recording state (v1.20)
+        self.is_recording = False
+        self._current_performance = None
+        self._recording_start_time = 0.0
+
         # Initialiser la session SCAMP
         self._init_scamp_session()
 
     def _init_scamp_session(self):
         """Initialise la session SCAMP et charge les instruments."""
-        print("--- DÉMARRAGE LIQUID SOUL v1.19.2 (Nappes Fluides) ---")
+        print("--- DÉMARRAGE LIQUID SOUL v1.20 (Nappes Fluides) ---")
 
         if os.path.exists(self.soundfont_path):
             print(f"✅ SoundFont détectée : {self.soundfont_path}")
@@ -198,6 +203,55 @@ class QuoniamAudioEngine:
         """Change le mood/preset actuel."""
         config.ETAT["preset"] = mood_key
         print(f"🎭 Mood changé : {mood_key}")
+
+    # ============ RECORDING (v1.20) ============
+
+    def start_recording(self):
+        """Start transcribing the SCAMP session to capture all notes."""
+        if self.is_recording:
+            return
+        if self.session is None:
+            print("Cannot record: no active session")
+            return
+        try:
+            self._current_performance = self.session.start_transcribing()
+            self._recording_start_time = time.time()
+            self.is_recording = True
+            print("REC: Recording started")
+        except Exception as e:
+            print(f"REC: Recording start failed: {e}")
+
+    def stop_recording(self, output_dir="./recordings"):
+        """Stop transcribing and export to MIDI file. Returns the file path or None."""
+        if not self.is_recording or self._current_performance is None:
+            return None
+        try:
+            performance = self.session.stop_transcribing()
+            self.is_recording = False
+
+            os.makedirs(output_dir, exist_ok=True)
+
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            midi_path = os.path.join(output_dir, f"quoniam_{timestamp}.mid")
+
+            performance.export_to_midi_file(midi_path)
+            print(f"REC: Recording saved to {midi_path}")
+
+            self._current_performance = None
+            self._recording_start_time = 0.0
+            return midi_path
+        except Exception as e:
+            print(f"REC: Recording save failed: {e}")
+            self.is_recording = False
+            self._current_performance = None
+            return None
+
+    def get_recording_duration(self):
+        """Returns elapsed recording time in seconds."""
+        if self.is_recording and self._recording_start_time > 0:
+            return time.time() - self._recording_start_time
+        return 0.0
 
     # ============ UTILITAIRES MUSICAUX ============
 
@@ -382,7 +436,7 @@ class QuoniamAudioEngine:
 
     def _play_orchestra_mode(self):
         """
-        Gère la lecture en mode orchestre avec AI Conductor v1.19.2.
+        Gère la lecture en mode orchestre avec AI Conductor v1.20.
         ORGANIC SOUL & PHRASING + CONTINUUM MÉLODIQUE
         """
         actifs = config.ETAT.get("instruments_actifs", [])

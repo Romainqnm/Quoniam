@@ -12,7 +12,7 @@ import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v1.19.2"
+    page.title = "QUONIAM v1.20"
 
     # Lock to serialize all Flet .update() calls (prevents concurrent diff crash)
     _ui_lock = threading.Lock()
@@ -34,9 +34,14 @@ def main(page: ft.Page):
     page.window.bgcolor = "#00000000"
     page.bgcolor = "#00000000"
 
+    # --- SETTINGS (v1.20) ---
+    config.load_settings_from_storage(page)
+    if config.SETTINGS["fullscreen"]:
+        page.window.full_screen = True
+
     # --- INITIALISATION AUDIO (Séquentielle) ---
-    print("Lancement v1.19.2 Kaleidoscope & Particles...")
-    # PALETTES DE COULEURS (v1.19.2 — deep, desaturated backgrounds for kaleidoscope contrast)
+    print("Lancement v1.20 Kaleidoscope & Particles...")
+    # PALETTES DE COULEURS (v1.20 — deep, desaturated backgrounds for kaleidoscope contrast)
     COLORS_ACCUEIL  = ["#08060f", "#1a1535", "#12101e"]
     COLORS_ELEMENTS = ["#1a0505", "#2a0a0a", "#1f0808"]   # Deep ember
     COLORS_SAISONS  = ["#051208", "#0a1f0e", "#081a0b"]   # Deep forest
@@ -173,7 +178,7 @@ def main(page: ft.Page):
         animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
 
-    # --- KALEIDOSCOPE VISUALIZER v1.19.2 ---
+    # --- KALEIDOSCOPE VISUALIZER v1.20 ---
     # Unified color palettes (6 colors per preset for layered blending)
     KALEIDOSCOPE_COLORS = {
         "home": ["#4dd0e1", "#00bcd4", "#0097a7", "#ffffff", "#b0bec5", "#cfd8dc"],
@@ -478,7 +483,7 @@ def main(page: ft.Page):
             return shapes
 
     # ═══════════════════════════════════════════════════════════
-    #  PARTICLE SYSTEM v1.19.2
+    #  PARTICLE SYSTEM v1.20
     # ═══════════════════════════════════════════════════════════
 
     class ParticleSystem:
@@ -805,7 +810,7 @@ def main(page: ft.Page):
         spacing=8, alignment=ft.MainAxisAlignment.CENTER
     )
     btn_play_container = ft.Container(
-        content=btn_play_content, padding=15, border_radius=30, 
+        content=btn_play_content, padding=15, border_radius=30,
         alignment=ft.Alignment(0, 0), width=200, ink=True,
         # Liquid Glass Style
         bgcolor=ft.Colors.with_opacity(0.15, "white"),
@@ -813,6 +818,19 @@ def main(page: ft.Page):
         blur=ft.Blur(15, 15),
         shadow=ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.3, "#56ab2f")),
     )
+
+    # v1.20: Recording controls
+    recording_active = [False]  # mutable for closure access
+    btn_record_content = get_ui_icon(assets.SVG_RECORD, color="#ff4444", size=16)
+    btn_record_container = ft.Container(
+        content=btn_record_content, width=50, height=50, border_radius=25,
+        alignment=ft.Alignment(0, 0), ink=True, tooltip="Record",
+        bgcolor=ft.Colors.with_opacity(0.15, "white"),
+        border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
+        blur=ft.Blur(10, 10),
+    )
+    recording_timer_text = ft.Text("00:00", size=11, color="#ff4444", visible=False, weight=ft.FontWeight.BOLD)
+    recording_dot = ft.Container(width=8, height=8, border_radius=4, bgcolor="#ff4444", visible=False)
 
     container_presets = ft.Container()
     
@@ -836,7 +854,7 @@ def main(page: ft.Page):
         animate_opacity=ft.Animation(500, ft.AnimationCurve.EASE_IN_OUT)
     )
 
-    # --- FOCUS MODE (v1.19.2 — Kaleidoscope & Particles) ---
+    # --- FOCUS MODE (v1.20 — Kaleidoscope & Particles) ---
     focus_mode = False
 
     def toggle_focus(e):
@@ -873,7 +891,7 @@ def main(page: ft.Page):
     main_layout_stack = ft.Stack(
         [
             bg_gradient,
-            kaleidoscope_canvas,   # v1.19.2 Canvas kaleidoscope + particles
+            kaleidoscope_canvas,   # v1.20 Canvas kaleidoscope + particles
             content_layer,
             focus_exit_hint,
         ],
@@ -1081,6 +1099,155 @@ def main(page: ft.Page):
     
     btn_play_container.on_click = toggle_play
 
+    # v1.20: Recording toggle
+    def toggle_recording(e):
+        if not recording_active[0]:
+            # Start recording
+            global_audio.start_recording()
+            recording_active[0] = True
+            btn_record_container.content = get_ui_icon(assets.SVG_STOP, color="white", size=16)
+            btn_record_container.bgcolor = "#ff4444"
+            btn_record_container.border = ft.Border.all(2, "#ff4444")
+            btn_record_container.tooltip = "Stop Recording"
+            recording_timer_text.visible = True
+            recording_dot.visible = True
+            safe_update(btn_record_container, recording_timer_text, recording_dot)
+
+            def update_timer():
+                while recording_active[0]:
+                    elapsed = global_audio.get_recording_duration()
+                    mins = int(elapsed // 60)
+                    secs = int(elapsed % 60)
+                    recording_timer_text.value = f"{mins:02d}:{secs:02d}"
+                    recording_timer_text.color = "#ff4444" if int(elapsed) % 2 == 0 else "#ff8888"
+                    try:
+                        safe_update(recording_timer_text)
+                    except Exception:
+                        pass
+                    time.sleep(0.5)
+
+            threading.Thread(target=update_timer, daemon=True).start()
+        else:
+            # Stop recording
+            export_dir = config.SETTINGS.get("export_folder", "./recordings")
+            saved_path = global_audio.stop_recording(output_dir=export_dir)
+            recording_active[0] = False
+
+            btn_record_container.content = get_ui_icon(assets.SVG_RECORD, color="#ff4444", size=16)
+            btn_record_container.bgcolor = ft.Colors.with_opacity(0.15, "white")
+            btn_record_container.border = ft.Border.all(1, ft.Colors.with_opacity(0.3, "white"))
+            btn_record_container.tooltip = "Record"
+            recording_timer_text.visible = False
+            recording_timer_text.value = "00:00"
+            recording_dot.visible = False
+            safe_update(btn_record_container, recording_timer_text, recording_dot)
+
+            if saved_path:
+                snack = ft.SnackBar(
+                    ft.Text(f"Recording saved: {saved_path}", color="white"),
+                    bgcolor="#4caf50", open=True
+                )
+                page.overlay.append(snack)
+                safe_update(page)
+
+    btn_record_container.on_click = toggle_recording
+
+    # v1.20: Settings dialog
+    def open_settings_dialog(e):
+        def on_setting_change(key, value, callback=None):
+            config.save_setting(page, key, value)
+            if callback:
+                callback(value)
+
+        def apply_fullscreen(value):
+            page.window.full_screen = value
+            safe_update(page)
+
+        def confirm_reset():
+            config.reset_all_settings(page)
+            main_layout_stack.controls.pop()
+            safe_update(page)
+            snack = ft.SnackBar(ft.Text("Settings reset to defaults", color="white"), bgcolor="#ff9800", open=True)
+            page.overlay.append(snack)
+            safe_update(page)
+
+        sw_fullscreen = ft.Switch(
+            value=config.SETTINGS["fullscreen"],
+            active_color="#00E5FF",
+            on_change=lambda e: on_setting_change("fullscreen", e.control.value, apply_fullscreen)
+        )
+        sw_zen_intro = ft.Switch(
+            value=config.SETTINGS["zen_intro"],
+            active_color="#00E5FF",
+            on_change=lambda e: on_setting_change("zen_intro", e.control.value)
+        )
+        dd_quality = ft.Dropdown(
+            value=config.SETTINGS["visual_quality"],
+            options=[ft.dropdown.Option("low"), ft.dropdown.Option("medium"), ft.dropdown.Option("high")],
+            width=120, height=40, text_size=12, color="white", border_color="#44ffffff",
+        )
+        dd_quality.on_select = lambda e: on_setting_change("visual_quality", e.control.value)
+        dd_language = ft.Dropdown(
+            value=config.SETTINGS["language"],
+            options=[ft.dropdown.Option("EN"), ft.dropdown.Option("FR")],
+            width=80, height=40, text_size=12, color="white", border_color="#44ffffff",
+        )
+        dd_language.on_select = lambda e: on_setting_change("language", e.control.value)
+        txt_export = ft.Text(config.SETTINGS["export_folder"], size=11, color="#aaffffff")
+        btn_reset = ft.Container(
+            content=ft.Text("RESET ALL", size=11, color="#ff6b6b", weight=ft.FontWeight.BOLD),
+            on_click=lambda e: confirm_reset(),
+            padding=10, border_radius=10,
+            border=ft.Border.all(1, "#44ff6b6b"), ink=True,
+        )
+
+        def close_settings(e):
+            main_layout_stack.controls.pop()
+            safe_update(page)
+
+        settings_content = ft.Column([
+            ft.Text("IMMERSION", size=11, weight=ft.FontWeight.BOLD, color="#88ffffff"),
+            ft.Row([ft.Text("Fullscreen", size=12, color="white", expand=True), sw_fullscreen]),
+            ft.Row([ft.Text("Zen Intro", size=12, color="white", expand=True), sw_zen_intro]),
+            ft.Row([ft.Text("Visual Quality", size=12, color="white", expand=True), dd_quality]),
+            ft.Divider(height=1, color="#22ffffff"),
+            ft.Text("APP", size=11, weight=ft.FontWeight.BOLD, color="#88ffffff"),
+            ft.Row([ft.Text("Language", size=12, color="white", expand=True), dd_language]),
+            ft.Row([ft.Text("Export Folder", size=12, color="white", expand=True), txt_export]),
+            ft.Container(height=10),
+            ft.Row([btn_reset, ft.Container(expand=True),
+                    ft.Container(content=ft.Text("CLOSE", color="#88ffffff"), on_click=close_settings, padding=10, ink=True)
+            ]),
+        ], spacing=8, width=320, scroll=ft.ScrollMode.AUTO)
+
+        dialog_container = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    get_ui_icon(assets.SVG_SETTINGS, color="white", size=20),
+                    ft.Text("SETTINGS", size=16, weight=ft.FontWeight.BOLD, color="white"),
+                ], spacing=10),
+                ft.Container(height=10),
+                settings_content,
+            ], width=350, spacing=0),
+            bgcolor="#222222",
+            border=ft.Border.all(1, "#44ffffff"),
+            border_radius=15,
+            padding=20,
+            shadow=ft.BoxShadow(blur_radius=20, color="black"),
+            alignment=ft.Alignment(0, 0)
+        )
+
+        overlay = ft.Container(
+            content=dialog_container,
+            bgcolor=ft.Colors.with_opacity(0.8, "black"),
+            alignment=ft.Alignment(0, 0),
+            expand=True,
+            ink=False
+        )
+
+        main_layout_stack.controls.append(overlay)
+        safe_update(page)
+
     # --- NAVIGATION ---
 
     # ZEN TIMER LOGIC (v12.0)
@@ -1265,25 +1432,41 @@ def main(page: ft.Page):
             tooltip="Quit Application"
         )
 
+        btn_settings_home = ft.Container(
+            content=ft.Row([
+                get_ui_icon(assets.SVG_SETTINGS, color="#aaffffff", size=16),
+                ft.Text("SETTINGS", size=12, weight=ft.FontWeight.BOLD, color="#aaffffff")
+            ], spacing=8, alignment=ft.MainAxisAlignment.CENTER),
+            padding=ft.Padding(left=20, top=10, right=20, bottom=10),
+            border_radius=25,
+            bgcolor=ft.Colors.with_opacity(0.1, "white"),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.15, "white")),
+            blur=ft.Blur(10, 10),
+            ink=True,
+            on_click=open_settings_dialog,
+            tooltip="Settings"
+        )
+
         return ft.Column([
             ft.Container(height=40),
             creer_header(),
             ft.Container(height=40),
-            
+
             # ORCHESTRA SECTION
             ft.Text("MAIN STAGE", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
             hero_carte,
-            
+
             ft.Container(height=30),
-            
+
             # AMBIENCE SECTION
             ft.Text("ATMOSPHERES", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
             ft.Row(controls=liste_cartes_ambiance, alignment=ft.MainAxisAlignment.CENTER, wrap=True, spacing=10),
 
             ft.Container(expand=True),
             ft.Row([
-                ft.Text("v1.19.2 Kaleidoscope", size=10, color="#44ffffff"),
+                ft.Text("v1.20 Kaleidoscope", size=10, color="#44ffffff"),
                 ft.Container(width=15),
+                btn_settings_home,
                 btn_quit,
             ], alignment=ft.MainAxisAlignment.CENTER, spacing=5),
             ft.Container(height=15),
@@ -1447,7 +1630,7 @@ def main(page: ft.Page):
                 ft.Container(expand=True),
                 ft.Row([
                     ft.Text("LIQUID SOUL", size=18, weight=ft.FontWeight.BOLD, color="white", font_family="Verdana"),
-                    ft.Text("v1.19.2", size=10, color="#88ffffff", italic=True)
+                    ft.Text("v1.20", size=10, color="#88ffffff", italic=True)
                 ], spacing=5),
                 ft.Container(expand=True),
                 # We replace the top_bar (navigation) with audio controls here? 
@@ -1473,6 +1656,16 @@ def main(page: ft.Page):
                     border_radius=50,
                     ink=True,
                 ),
+                ft.Container(width=5),
+                ft.Container(
+                    content=get_ui_icon(assets.SVG_SETTINGS, color="white", size=18),
+                    on_click=open_settings_dialog,
+                    tooltip="Settings",
+                    padding=5,
+                    border_radius=50,
+                    ink=True,
+                ),
+                recording_dot,
                 ft.Container(width=5),
                 top_bar,
                 
@@ -1505,7 +1698,11 @@ def main(page: ft.Page):
             creer_presets_pills(),
             centre,
             ft.Container(height=10),
-            btn_play_container,
+            ft.Row([
+                btn_record_container,
+                btn_play_container,
+                recording_timer_text,
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=10),
             ft.Container(height=5),
             creer_panneau_sliders(),
             ft.Container(height=10),
@@ -1540,7 +1737,7 @@ def main(page: ft.Page):
         svg_content = mapping.get(icon_key, assets.SVG_NOTE)
         b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
 
-        # v1.19.2 Liquid Glass preset button
+        # v1.20 Liquid Glass preset button
         icon_with_glow = ft.Container(
             content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
                              width=32, height=32,
@@ -1829,7 +2026,7 @@ def main(page: ft.Page):
              svg_content = get_emotion_asset(val)
              b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
 
-             # v1.19.2 Liquid Glass emotion button
+             # v1.20 Liquid Glass emotion button
              icon_glow = ft.Container(
                  content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
                                   width=20, height=20,
@@ -2227,10 +2424,10 @@ def main(page: ft.Page):
     thread_fond.start()
 
 if __name__ == "__main__":
-    print("Lancement v1.19.2 Kaleidoscope...")
+    print("Lancement v1.20 Kaleidoscope...")
 
     # Initialiser et démarrer le moteur audio
     audio_engine = QuoniamAudioEngine()
     audio_engine.start()
 
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    ft.app(main, view=ft.AppView.WEB_BROWSER)
