@@ -12,7 +12,7 @@ import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v17.0"
+    page.title = "QUONIAM v1.19.2"
 
     # Lock to serialize all Flet .update() calls (prevents concurrent diff crash)
     _ui_lock = threading.Lock()
@@ -35,8 +35,8 @@ def main(page: ft.Page):
     page.bgcolor = "#00000000"
 
     # --- INITIALISATION AUDIO (Séquentielle) ---
-    print("Lancement v17.0 Kaleidoscope...")
-    # PALETTES DE COULEURS (v17.0 — deep, desaturated backgrounds for kaleidoscope contrast)
+    print("Lancement v1.19.2 Kaleidoscope & Particles...")
+    # PALETTES DE COULEURS (v1.19.2 — deep, desaturated backgrounds for kaleidoscope contrast)
     COLORS_ACCUEIL  = ["#08060f", "#1a1535", "#12101e"]
     COLORS_ELEMENTS = ["#1a0505", "#2a0a0a", "#1f0808"]   # Deep ember
     COLORS_SAISONS  = ["#051208", "#0a1f0e", "#081a0b"]   # Deep forest
@@ -173,7 +173,7 @@ def main(page: ft.Page):
         animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
 
-    # --- KALEIDOSCOPE VISUALIZER v17.0 ---
+    # --- KALEIDOSCOPE VISUALIZER v1.19.2 ---
     # Unified color palettes (6 colors per preset for layered blending)
     KALEIDOSCOPE_COLORS = {
         "home": ["#4dd0e1", "#00bcd4", "#0097a7", "#ffffff", "#b0bec5", "#cfd8dc"],
@@ -477,8 +477,183 @@ def main(page: ft.Page):
 
             return shapes
 
+    # ═══════════════════════════════════════════════════════════
+    #  PARTICLE SYSTEM v1.19.2
+    # ═══════════════════════════════════════════════════════════
+
+    class ParticleSystem:
+        """
+        Ambient particle system synced with KaleidoscopeEngine.
+        Particles drift upward with sinusoidal wobble, fade in/out,
+        and use the current kaleidoscope palette colors.
+        """
+
+        def __init__(self, engine: KaleidoscopeEngine):
+            self.engine = engine
+            self.particles: list[dict] = []
+            self.max_particles = 22
+            self.spawn_rate = 0.35  # seconds between spawns
+            self._last_spawn = 0.0
+            self._shapes = ["circle", "diamond", "star", "dot"]
+
+        def _spawn_particle(self, t: float) -> dict:
+            """Create a new particle with randomized properties."""
+            palette = self.engine._palette
+            color = random.choice(palette) if palette else "#ffffff"
+            # Slight hue variation: shift hex color brightness
+            shape = random.choice(self._shapes)
+            size = random.uniform(2.0, 6.0)
+            lifespan = random.uniform(3.0, 5.5)
+
+            # Spawn zone: bottom 40% of canvas, spread horizontally
+            w, h = self.engine.width, self.engine.height
+            x = random.uniform(w * 0.1, w * 0.9)
+            y = random.uniform(h * 0.55, h * 0.95)
+
+            return {
+                "x": x, "y": y,
+                "vx": random.uniform(-8, 8),       # horizontal drift speed
+                "vy": random.uniform(-25, -12),     # upward speed (negative = up)
+                "size": size,
+                "color": color,
+                "shape": shape,
+                "born": t,
+                "lifespan": lifespan,
+                "wobble_freq": random.uniform(1.5, 3.5),   # Hz
+                "wobble_amp": random.uniform(8, 25),        # px
+                "phase": random.uniform(0, 2 * math.pi),
+                "rotation": random.uniform(0, 2 * math.pi),
+                "rot_speed": random.uniform(-0.8, 0.8),
+            }
+
+        def _particle_opacity(self, age: float, lifespan: float) -> float:
+            """Fade in (15%) → full → fade out (25%)."""
+            if age < 0:
+                return 0.0
+            ratio = age / lifespan
+            if ratio < 0.15:
+                return ratio / 0.15  # Fade in
+            elif ratio > 0.75:
+                return max(0.0, (1.0 - ratio) / 0.25)  # Fade out
+            return 1.0
+
+        def _render_circle(self, x, y, size, color, opacity):
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.7, opacity * 0.6), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            return cv.Circle(x, y, max(1, size), paint=paint)
+
+        def _render_diamond(self, x, y, size, angle, color, opacity):
+            s = max(size, 1.5)
+            ca, sa = math.cos(angle), math.sin(angle)
+            pa, pb = math.cos(angle + math.pi / 2), math.sin(angle + math.pi / 2)
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.65, opacity * 0.55), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            return cv.Path(
+                elements=[
+                    cv.Path.MoveTo(x + ca * s * 1.8, y + sa * s * 1.8),
+                    cv.Path.LineTo(x + pa * s * 0.7, y + pb * s * 0.7),
+                    cv.Path.LineTo(x - ca * s * 1.8, y - sa * s * 1.8),
+                    cv.Path.LineTo(x - pa * s * 0.7, y - pb * s * 0.7),
+                    cv.Path.Close(),
+                ],
+                paint=paint,
+            )
+
+        def _render_star(self, x, y, size, angle, color, opacity):
+            """4-pointed star."""
+            s = max(size, 1.5)
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.6, opacity * 0.5), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            points = []
+            for i in range(8):
+                a = angle + i * (math.pi / 4)
+                r = s * 1.6 if i % 2 == 0 else s * 0.5
+                points.append((x + math.cos(a) * r, y + math.sin(a) * r))
+            elements = [cv.Path.MoveTo(points[0][0], points[0][1])]
+            for px, py in points[1:]:
+                elements.append(cv.Path.LineTo(px, py))
+            elements.append(cv.Path.Close())
+            return cv.Path(elements=elements, paint=paint)
+
+        def _render_dot(self, x, y, size, color, opacity):
+            """Tiny bright dot — like a distant sparkle."""
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.85, opacity * 0.75), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            return cv.Circle(x, y, max(0.8, size * 0.4), paint=paint)
+
+        def generate_particles(self) -> list:
+            """Update particles and return cv shapes."""
+            t = time.time()
+            intensity = config.ETAT.get("intensite", 30)
+            bpm = config.ETAT.get("bpm", 120)
+
+            # Adaptive max particles: more when intensity is high
+            self.max_particles = int(15 + (intensity / 100.0) * 12)
+
+            # Spawn new particles
+            if t - self._last_spawn > self.spawn_rate and len(self.particles) < self.max_particles:
+                self.particles.append(self._spawn_particle(t))
+                self._last_spawn = t
+                # Occasionally spawn 2 at once for variety
+                if random.random() < 0.3 and len(self.particles) < self.max_particles:
+                    self.particles.append(self._spawn_particle(t))
+
+            # BPM-synced pulse: particles subtly breathe
+            bpm_pulse = 0.5 + 0.5 * math.sin(t * (bpm / 60.0) * math.pi)
+
+            # Update and render
+            shapes = []
+            alive = []
+            for p in self.particles:
+                age = t - p["born"]
+                if age > p["lifespan"]:
+                    continue  # Dead particle
+
+                alive.append(p)
+                opacity = self._particle_opacity(age, p["lifespan"])
+                if opacity <= 0.02:
+                    continue
+
+                # Position update: drift + sinusoidal wobble
+                dt = age
+                wobble_x = math.sin(dt * p["wobble_freq"] + p["phase"]) * p["wobble_amp"]
+                x = p["x"] + p["vx"] * dt + wobble_x
+                y = p["y"] + p["vy"] * dt
+
+                # Size pulsation synced with BPM
+                size = p["size"] * (0.85 + bpm_pulse * 0.3)
+
+                angle = p["rotation"] + p["rot_speed"] * dt
+
+                # Render based on shape
+                shape_type = p["shape"]
+                if shape_type == "circle":
+                    shapes.append(self._render_circle(x, y, size, p["color"], opacity))
+                elif shape_type == "diamond":
+                    shapes.append(self._render_diamond(x, y, size, angle, p["color"], opacity))
+                elif shape_type == "star":
+                    shapes.append(self._render_star(x, y, size, angle, p["color"], opacity))
+                elif shape_type == "dot":
+                    shapes.append(self._render_dot(x, y, size, p["color"], opacity))
+
+            self.particles = alive
+            return shapes
+
     # --- KALEIDOSCOPE CANVAS ---
     kaleidoscope_engine = KaleidoscopeEngine()
+    particle_system = ParticleSystem(kaleidoscope_engine)
 
     def on_canvas_resize(e: cv.CanvasResizeEvent):
         kaleidoscope_engine.resize(e.width, e.height)
@@ -493,7 +668,9 @@ def main(page: ft.Page):
         while True:
             try:
                 shapes = kaleidoscope_engine.generate_frame(focus_mode)
-                kaleidoscope_canvas.shapes = shapes
+                # Overlay particles on top of kaleidoscope
+                particles = particle_system.generate_particles()
+                kaleidoscope_canvas.shapes = shapes + particles
                 safe_update(kaleidoscope_canvas)
             except Exception:
                 pass
@@ -623,11 +800,18 @@ def main(page: ft.Page):
     lbl_bpm = ft.Text("120 BPM", size=14, weight=ft.FontWeight.BOLD) # v11.0: Global for Auto-Drift Sync
     switch_auto = ft.Switch(value=False, active_color="#00E5FF")
     
-    btn_play_content = ft.Text("▶  PLAY", color="white", weight=ft.FontWeight.BOLD)
+    btn_play_content = ft.Row(
+        [get_ui_icon(assets.SVG_PLAY, color="white", size=18), ft.Text("PLAY", color="white", weight=ft.FontWeight.BOLD)],
+        spacing=8, alignment=ft.MainAxisAlignment.CENTER
+    )
     btn_play_container = ft.Container(
         content=btn_play_content, padding=15, border_radius=30, 
         alignment=ft.Alignment(0, 0), width=200, ink=True,
-        gradient=ft.LinearGradient(colors=["#56ab2f", "#a8e063"]) 
+        # Liquid Glass Style
+        bgcolor=ft.Colors.with_opacity(0.15, "white"),
+        border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "white")),
+        blur=ft.Blur(15, 15),
+        shadow=ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.3, "#56ab2f")),
     )
 
     container_presets = ft.Container()
@@ -652,7 +836,7 @@ def main(page: ft.Page):
         animate_opacity=ft.Animation(500, ft.AnimationCurve.EASE_IN_OUT)
     )
 
-    # --- FOCUS MODE (v17.0 — Kaleidoscope) ---
+    # --- FOCUS MODE (v1.19.2 — Kaleidoscope & Particles) ---
     focus_mode = False
 
     def toggle_focus(e):
@@ -670,7 +854,7 @@ def main(page: ft.Page):
 
     focus_exit_hint = ft.Container(
         content=ft.Row([
-            ft.Text("\U0001F441", size=14),
+            get_ui_icon(assets.SVG_EYE, color="#88ffffff", size=14),
             ft.Text("EXIT FOCUS", size=10, weight=ft.FontWeight.BOLD,
                      color="#88ffffff")
         ], spacing=5),
@@ -689,7 +873,7 @@ def main(page: ft.Page):
     main_layout_stack = ft.Stack(
         [
             bg_gradient,
-            kaleidoscope_canvas,   # v17.0 Canvas kaleidoscope visualizer
+            kaleidoscope_canvas,   # v1.19.2 Canvas kaleidoscope + particles
             content_layer,
             focus_exit_hint,
         ],
@@ -800,11 +984,17 @@ def main(page: ft.Page):
             icon_display.content = new_icon
             
         if config.ETAT["actif"]:
-            btn_play_content.value = "⏸  PAUSE"
-            btn_play_container.gradient = ft.LinearGradient(colors=["#ff416c", "#ff4b2b"])
+            btn_play_content.controls = [
+                get_ui_icon(assets.SVG_PAUSE, color="white", size=18),
+                ft.Text("PAUSE", color="white", weight=ft.FontWeight.BOLD)
+            ]
+            btn_play_container.shadow = ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.4, "#ff416c"))
         else:
-            btn_play_content.value = "▶  PLAY"
-            btn_play_container.gradient = ft.LinearGradient(colors=["#56ab2f", "#a8e063"])
+            btn_play_content.controls = [
+                get_ui_icon(assets.SVG_PLAY, color="white", size=18),
+                ft.Text("PLAY", color="white", weight=ft.FontWeight.BOLD)
+            ]
+            btn_play_container.shadow = ft.BoxShadow(blur_radius=20, spread_radius=-5, color=ft.Colors.with_opacity(0.3, "#56ab2f"))
             
         switch_auto.value = config.ETAT["mode_auto"]
         
@@ -853,10 +1043,11 @@ def main(page: ft.Page):
                  # Better: re-use the mapping keys from get_asset logic if possible, or just checking if data is not None
                  # Let's simple check if data is not None and matches our known keys
                  instruments_mapping = [
-                     "violon", "violoncelle", "contrebasse", "guitare", "basse", "harpe",
-                     "flute", "clarinette", "hautbois", "trompette", "cor", "cuivres",
-                     "piano", "orgue", "timbales", "batterie",
-                     "choir", "voice", "celesta", "bells", "pizzicato"
+                     "violon", "alto", "violoncelle", "contrebasse", "guitare", "basse", "harpe", "pizzicato",
+                     "flute", "piccolo", "clarinette", "hautbois", "basson", "trompette", "cor", "cuivres",
+                     "piano", "orgue", "clavecin", "accordeon",
+                     "timbales", "batterie", "xylophone", "glockenspiel",
+                     "choir", "voice", "celesta", "bells"
                  ]
                  
                  update_recursive(main_col.controls)
@@ -1049,6 +1240,30 @@ def main(page: ft.Page):
             carte("leaf", "SEASONS", "Time & Journey", "saisons", "green", "green", "yellow"),
             carte("orb", "ATMOS", "Mood & Abstraction", "atmos", "purple", "purple", "pink"),
         ]
+        def quitter_app(e):
+            """Cleanly shut down audio engine and close the app."""
+            try:
+                config.ETAT["actif"] = False
+                audio_engine.stop()
+            except Exception:
+                pass
+            page.window.close()
+            os._exit(0)
+
+        btn_quit = ft.Container(
+            content=ft.Row([
+                get_ui_icon(assets.SVG_POWER, color="#ff6b6b", size=16),
+                ft.Text("QUIT", size=12, weight=ft.FontWeight.BOLD, color="#ff6b6b")
+            ], spacing=8, alignment=ft.MainAxisAlignment.CENTER),
+            padding=ft.Padding(left=20, top=10, right=20, bottom=10),
+            border_radius=25,
+            bgcolor=ft.Colors.with_opacity(0.1, "white"),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.15, "#ff6b6b")),
+            blur=ft.Blur(10, 10),
+            ink=True,
+            on_click=quitter_app,
+            tooltip="Quit Application"
+        )
 
         return ft.Column([
             ft.Container(height=40),
@@ -1066,8 +1281,13 @@ def main(page: ft.Page):
             ft.Row(controls=liste_cartes_ambiance, alignment=ft.MainAxisAlignment.CENTER, wrap=True, spacing=10),
 
             ft.Container(expand=True),
-            ft.Text("v17.0 Kaleidoscope", size=10, color="#44ffffff")
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+            ft.Row([
+                ft.Text("v1.19.2 Kaleidoscope", size=10, color="#44ffffff"),
+                ft.Container(width=15),
+                btn_quit,
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=5),
+            ft.Container(height=15),
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def creer_presets_pills():
         """Compact pill-style preset row for current collection."""
@@ -1142,7 +1362,10 @@ def main(page: ft.Page):
 
     def creer_contenu_controle():
         bouton_retour = ft.Container(
-            content=ft.Text("⬅️  BACK", size=12, weight=ft.FontWeight.BOLD, color="white"),
+            content=ft.Row([
+                get_ui_icon(assets.SVG_ARROW_LEFT, color="white", size=16),
+                ft.Text("BACK", size=12, weight=ft.FontWeight.BOLD, color="white")
+            ], spacing=5),
             padding=10, border_radius=10, ink=True, on_click=retour_accueil
         )
 
@@ -1224,7 +1447,7 @@ def main(page: ft.Page):
                 ft.Container(expand=True),
                 ft.Row([
                     ft.Text("LIQUID SOUL", size=18, weight=ft.FontWeight.BOLD, color="white", font_family="Verdana"),
-                    ft.Text("v17.0", size=10, color="#88ffffff", italic=True)
+                    ft.Text("v1.19.2", size=10, color="#88ffffff", italic=True)
                 ], spacing=5),
                 ft.Container(expand=True),
                 # We replace the top_bar (navigation) with audio controls here? 
@@ -1243,7 +1466,7 @@ def main(page: ft.Page):
 
                 ft.Container(width=5),
                 ft.Container(
-                    content=ft.Text("\U0001F441", size=16),
+                    content=get_ui_icon(assets.SVG_EYE, color="white", size=18),
                     on_click=toggle_focus,
                     tooltip="Focus Mode",
                     padding=5,
@@ -1281,11 +1504,12 @@ def main(page: ft.Page):
             header_nav,
             creer_presets_pills(),
             centre,
-            creer_panneau_sliders(),
-            ft.Container(height=5),
-            btn_play_container,
             ft.Container(height=10),
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
+            btn_play_container,
+            ft.Container(height=5),
+            creer_panneau_sliders(),
+            ft.Container(height=10),
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, scroll=ft.ScrollMode.AUTO, expand=True)
 
 
     def changer_preset(e):
@@ -1316,7 +1540,7 @@ def main(page: ft.Page):
         svg_content = mapping.get(icon_key, assets.SVG_NOTE)
         b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
 
-        # v17.0 Liquid Glass preset button
+        # v1.19.2 Liquid Glass preset button
         icon_with_glow = ft.Container(
             content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
                              width=32, height=32,
@@ -1435,18 +1659,22 @@ def main(page: ft.Page):
         def get_asset(code):
             mapping = {
                 # STRINGS
-                "violon": assets.SVG_VIOLIN, "violoncelle": assets.SVG_CELLO, "contrebasse": assets.SVG_CONTRABASS,
-                "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS, "harpe": assets.SVG_HARP,
-                # WINDS
-                "flute": assets.SVG_FLUTE, "clarinette": assets.SVG_CLARINET, 
-                "hautbois": assets.SVG_OBOE, "trompette": assets.SVG_TRUMPET, "cor": assets.SVG_HORN, "cuivres": assets.SVG_TRUMPET, # Fallback
+                "violon": assets.SVG_VIOLIN, "alto": assets.SVG_VIOLA, "violoncelle": assets.SVG_CELLO,
+                "contrebasse": assets.SVG_CONTRABASS, "guitare": assets.SVG_GUITAR, "basse": assets.SVG_BASS,
+                "harpe": assets.SVG_HARP, "pizzicato": assets.SVG_PIZZICATO,
+                # WINDS & BRASS
+                "flute": assets.SVG_FLUTE, "piccolo": assets.SVG_PICCOLO, "clarinette": assets.SVG_CLARINET,
+                "hautbois": assets.SVG_OBOE, "basson": assets.SVG_BASSOON,
+                "trompette": assets.SVG_TRUMPET, "cor": assets.SVG_HORN, "cuivres": assets.SVG_TRUMPET,
                 # KEYS
                 "piano": assets.SVG_PIANO, "orgue": assets.SVG_ORGAN,
+                "clavecin": assets.SVG_HARPSICHORD, "accordeon": assets.SVG_ACCORDION,
                 # PERCUSSION
                 "timbales": assets.SVG_DRUM, "batterie": assets.SVG_DRUM,
-                # v10.6 ETHEREAL & VOICES
+                "xylophone": assets.SVG_XYLOPHONE, "glockenspiel": assets.SVG_GLOCKENSPIEL,
+                # ETHEREAL & VOICES
                 "choir": assets.SVG_CHOIR, "voice": assets.SVG_VOICE, "celesta": assets.SVG_CELESTA,
-                "bells": assets.SVG_BELLS, "pizzicato": assets.SVG_PIZZICATO
+                "bells": assets.SVG_BELLS,
             }
             return mapping.get(code, assets.SVG_NOTE)
 
@@ -1601,7 +1829,7 @@ def main(page: ft.Page):
              svg_content = get_emotion_asset(val)
              b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
 
-             # v17.0 Liquid Glass emotion button
+             # v1.19.2 Liquid Glass emotion button
              icon_glow = ft.Container(
                  content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
                                   width=20, height=20,
@@ -1775,39 +2003,42 @@ def main(page: ft.Page):
 
         return ft.Column([
             ft.Text("ORCHESTRA", size=18, weight=ft.FontWeight.BOLD, color="white"),
-            # ft.Row([txt_emotion], alignment=ft.MainAxisAlignment.CENTER), # Removed as requested
             ft.Container(height=5),
             
-            # STRINGS SECTIONS
-            section("STRINGS", [("Violin", "violon"), ("Cello", "violoncelle"), ("Bass", "contrebasse"), ("Harp", "harpe"), ("Guitar", "guitare")]),
+            # STRINGS
+            section("STRINGS", [
+                ("Violin", "violon"), ("Viola", "alto"), ("Cello", "violoncelle"),
+                ("Contrabass", "contrebasse"), ("Harp", "harpe"), ("Guitar", "guitare"),
+                ("Pizzicato", "pizzicato"),
+            ]),
             ft.Divider(color="#22ffffff"),
             
-            # WINDS SECTION
-            section("WINDS & BRASS", [("Flute", "flute"), ("Clarinet", "clarinette"), ("Oboe", "hautbois"), ("Horn", "cor"), ("Brass", "cuivres")]),
+            # WINDS & BRASS
+            section("WINDS & BRASS", [
+                ("Flute", "flute"), ("Piccolo", "piccolo"), ("Clarinet", "clarinette"),
+                ("Oboe", "hautbois"), ("Bassoon", "basson"),
+                ("Trumpet", "trompette"), ("Horn", "cor"), ("Brass", "cuivres"),
+            ]),
             ft.Divider(color="#22ffffff"),
             
-            # KEYS & PERCUSSION SECTION (Mixed Row)
-            ft.Row([
-                ft.Column([
-                    ft.Text("KEYS", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
-                    ft.Row([btn_inst("Piano", "piano"), btn_inst("Organ", "orgue")], spacing=5)
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                ft.Container(width=10),
-                ft.Column([
-                    ft.Text("PERCUSSION", size=12, weight=ft.FontWeight.BOLD, color="#88ffffff"),
-                    ft.Row([btn_inst("Timpani", "timbales"), btn_inst("Drums", "batterie")], spacing=5)
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
-            ], alignment=ft.MainAxisAlignment.CENTER),
-            
+            # KEYS
+            section("KEYS", [
+                ("Piano", "piano"), ("Organ", "orgue"),
+                ("Harpsichord", "clavecin"), ("Accordion", "accordeon"),
+            ]),
             ft.Divider(color="#22ffffff"),
             
-            # v10.6 ETHEREAL & VOICES SECTION
+            # PERCUSSION
+            section("PERCUSSION", [
+                ("Timpani", "timbales"), ("Drums", "batterie"),
+                ("Xylophone", "xylophone"), ("Glockenspiel", "glockenspiel"),
+            ]),
+            ft.Divider(color="#22ffffff"),
+            
+            # ETHEREAL & VOICES
             section("ETHEREAL & VOICES", [
-                ("Choir", "choir"), 
-                ("Voice", "voice"), 
-                ("Celesta", "celesta"), 
-                ("Bells", "bells"), 
-                ("Pizzicato", "pizzicato")
+                ("Choir", "choir"), ("Voice", "voice"),
+                ("Celesta", "celesta"), ("Bells", "bells"),
             ]),
 
             ft.Container(height=10),
@@ -1996,10 +2227,10 @@ def main(page: ft.Page):
     thread_fond.start()
 
 if __name__ == "__main__":
-    print("Lancement v17.0 Kaleidoscope...")
+    print("Lancement v1.19.2 Kaleidoscope...")
 
     # Initialiser et démarrer le moteur audio
     audio_engine = QuoniamAudioEngine()
     audio_engine.start()
 
-    ft.run(main)
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER)

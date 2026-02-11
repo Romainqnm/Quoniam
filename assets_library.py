@@ -97,6 +97,49 @@ SVG_ORGAN = """
 </svg>
 """
 
+# v1.19.2 NEW INSTRUMENTS
+SVG_VIOLA = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M14 5c0-1.5-1.5-2.5-3-2.5S8.5 3.5 8.5 5c0 1.5 1 2.5 2 3l-.4 2H8.5c-1.5 0-2.5 1-2.5 2.5v6c0 1.5 1 2.5 2.5 2.5h5c1.5 0 2.5-1 2.5-2.5v-6c0-1.5-1-2.5-2.5-2.5h-1.6l-.4-2c1-.5 2-1.5 2-3zm-3 10c-.83 0-1.5-.67-1.5-1.5S10.17 12 11 12s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+</svg>
+"""
+
+SVG_BASSOON = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M10 2v16c0 1.1.9 2 2 2h1c1.1 0 2-.9 2-2V2h-1v7h-1V2h-1v9h-1V2h-1zm2 4h1v1h-1V6zm0 3h1v1h-1V9zm0 3h1v1h-1v-1z"/>
+</svg>
+"""
+
+SVG_PICCOLO = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M20 5l-1.5-1.5c-.4-.4-1-.4-1.4 0L7 13.5c-.4.4-.4 1 0 1.4L8.5 16.4c.4.4 1 .4 1.4 0l10-10c.4-.4.4-1 0-1.4zM9 14c-.4 0-.7-.3-.7-.7s.3-.7.7-.7.7.3.7.7-.3.7-.7.7zm2.5-2.5c-.4 0-.7-.3-.7-.7s.3-.7.7-.7.7.3.7.7-.3.7-.7.7z"/>
+</svg>
+"""
+
+SVG_HARPSICHORD = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm1 3v10h2V7H5zm3 0v12h1.5V7H8zm3 0v12h1V7h-1zm2.5 0v12H15V7h-1.5zm3 0v10h2V7h-2z"/>
+</svg>
+"""
+
+SVG_ACCORDION = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M4 4h4v16H4V4zm5 0h.5l1 2 1-2h.5l1 2 1-2h.5l1 2 1-2H16v16h-.5l-1-2-1 2h-.5l-1-2-1 2H11l-1-2-1 2H9V4zm12 0h4v16h-4V4zM5 7h2v2H5V7zm0 4h2v2H5v-2zm0 4h2v2H5v-2zm16 0h2v2h-2v-2zm0-4h2v2h-2v-2zm0-4h2v2h-2V7z"/>
+</svg>
+"""
+
+SVG_XYLOPHONE = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M3 5h18v2H3V5zm1 3h16v2H4V8zm1 3h14v2H5v-2zm1 3h12v2H6v-2zm2 3h8v2H8v-2z"/>
+</svg>
+"""
+
+SVG_GLOCKENSPIEL = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M3 6h18v1.5H3V6zm1 3h16v1.5H4V9zm1 3h14v1.5H5V12zm1 3h12v1.5H6V15zm2 3h8v1.5H8V18z M2 5l1-2h18l1 2H2zm0 16l1 2h18l1-2H2z"/>
+</svg>
+"""
+
 # UI ICONS (v10.3)
 SVG_WAVES = """
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -212,3 +255,6 @@ SVG_PAUSE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill=
 SVG_VOLUME = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>"""
 SVG_MUTE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 9v6h4l5 5V4l-5 5H7z"/></svg>"""
 SVG_ARROW_RIGHT = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>"""
+SVG_ARROW_LEFT = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>"""
+SVG_EYE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>"""
+SVG_POWER = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>"""

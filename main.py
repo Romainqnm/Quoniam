@@ -1,10 +1,11 @@
-# main.py - MOTEUR AUDIO v14.4 (LIQUID SOUL + SOUNDFONT)
+# main.py - MOTEUR AUDIO v1.19.2 (ORGANIC SOUL + PHRASING)
 from scamp import Session, wait, fork, Envelope
 import random
 import os
 import time
 import config
 import gammes
+from ai_conductor import AIConductor, SUSTAINED_INSTRUMENTS, PLUCKED_INSTRUMENTS, PERCUSSIVE_INSTRUMENTS
 
 # --- CONFIGURATION SOUNDFONT ---
 NOM_SOUNDFONT = "FluidR3_GM.sf2"
@@ -78,11 +79,11 @@ def main():
             "eau": get_part("Marimba"),
             "air": get_part("Electric Piano 1"),
             "feu": get_part("Acoustic Guitar (nylon)"),
-            "terre": get_part("Cello"), # Shared with Orchestra
+            "terre": get_part("Cello"),
             "espace": get_part("Pad 7 (halo)"), 
             
             # Saisons
-            "hiver": get_part("Celesta"), # Shared with Orchestra
+            "hiver": get_part("Celesta"),
             "printemps": get_part("Kalimba"),
             "ete": get_part("Steel Drums"),
             "automne": get_part("Shakuhachi"),
@@ -93,34 +94,45 @@ def main():
             "cyber": get_part("Lead 2 (sawtooth)"),
             "lofi": get_part("Electric Piano 2"),
             "jungle": get_part("Pan Flute"),
-            "indus": get_part("Tubular Bells"), # Shared with Orchestra
+            "indus": get_part("Tubular Bells"),
             
-            # Orchestra Mode (Real Instruments)
+            # Orchestra Mode — STRINGS
             "piano": get_part("Acoustic Grand Piano"),
             "violon": get_part("Violin"),
-            "violoncelle": get_part("Cello"),           # Shared with 'terre'
+            "alto": get_part("Viola"),
+            "violoncelle": get_part("Cello"),
             "contrebasse": get_part("Contrabass"),
-            "flute": get_part("Flute"),
-            "clarinette": get_part("Clarinet"),
             "guitare": get_part("Acoustic Guitar (steel)"),
             "basse": get_part("Acoustic Bass"),
             "harpe": get_part("Orchestral Harp"),
-            # NEW INSTRUMENTS (v8.2)
-            "cuivres": get_part("Brass Section"),
-            "timbales": get_part("Timpani"),
+            "pizzicato": get_part("Pizzicato Strings"),
+            
+            # Orchestra Mode — WINDS & BRASS
+            "flute": get_part("Flute"),
+            "piccolo": get_part("Piccolo"),
+            "clarinette": get_part("Clarinet"),
             "hautbois": get_part("Oboe"),
+            "basson": get_part("Bassoon"),
             "cor": get_part("French Horn"),
+            "trompette": get_part("Trumpet"),
+            "cuivres": get_part("Brass Section"),
             
-            # v8.3 Additions
+            # Orchestra Mode — KEYS
             "orgue": get_part("Church Organ"),
-            "batterie": get_part("Orchestral Kit"), 
+            "clavecin": get_part("Harpsichord"),
+            "accordeon": get_part("Accordion"),
             
-            # v10.6 ETHEREAL & VOICES
+            # Orchestra Mode — PERCUSSION
+            "timbales": get_part("Timpani"),
+            "batterie": get_part("Orchestral Kit"),
+            "xylophone": get_part("Xylophone"),
+            "glockenspiel": get_part("Glockenspiel"),
+            
+            # Orchestra Mode — ETHEREAL & VOICES
             "choir": get_part("Choir Aahs"),
             "voice": get_part("Voice Oohs"),
-            "celesta": get_part("Celesta"),            # Shared with 'hiver'
-            "bells": get_part("Tubular Bells"),        # Shared with 'indus'
-            "pizzicato": get_part("Pizzicato Strings")
+            "celesta": get_part("Celesta"),
+            "bells": get_part("Tubular Bells"),
         }
         
         # Filter out None values (failed parts)
@@ -178,6 +190,10 @@ def main():
                 wait(0.1)
             wait(duree * 0.8)
 
+    # --- AI CONDUCTOR (v1.19.2) ---
+    conductor = AIConductor()
+    print("🎼 AI Conductor initialized (Organic Soul & Phrasing)")
+
     # --- COUCHE MELODIE ---
     def gerer_melodie():
         note_courante = 60
@@ -189,332 +205,135 @@ def main():
 
                 if config.ETAT["mode_auto"]: pass 
 
-                # ORCHESTRA MODE LOGIC
+                # ═══════════════════════════════════════════════════════
+                #  ORCHESTRA MODE v1.19.2 — ORGANIC SOUL & PHRASING
+                # ═══════════════════════════════════════════════════════
                 if config.ETAT.get("mode_orchestre", False):
                     actifs = config.ETAT.get("instruments_actifs", [])
                     if not actifs:
                         wait(0.5)
                         continue
-                        
-                    # --- EMOTION ENGINE (v9.0) ---
-                    # Defines target parameters for each emotion
-                    # --- EMOTION ENGINE (v10.4 Refactor) ---
-                    # Using shared definitions from config.py for UI sync
-                    EMOTIONS = config.EMOTIONS
                     
-                    # DEBUG EMOTION STATE
-                    # print(f"🐛 LOOP: emotion={config.ETAT.get('emotion')}, target={config.ETAT.get('target_emotion')}")
-
+                    # Skip MIDI if in audio loop modes
+                    current_collection = config.ETAT.get("collection")
+                    if current_collection in ["elements", "saisons", "atmos"]:
+                        wait(1.0)
+                        continue
+                    
+                    # ── EMOTION ENGINE ──
+                    EMOTIONS = config.EMOTIONS
                     current_emotion = config.ETAT.get("emotion", "aleatoire")
                     
-                    # Random Emotion Logic
                     if current_emotion == "aleatoire":
-                        # Initialize if needed
                         if "target_emotion" not in config.ETAT:
-                             config.ETAT["target_emotion"] = "joyeux"
-                             config.ETAT["last_emotion_switch"] = time.time()
-                        
-                        # Switch every 15-25 seconds
+                            config.ETAT["target_emotion"] = "joyeux"
+                            config.ETAT["last_emotion_switch"] = time.time()
                         if time.time() - config.ETAT.get("last_emotion_switch", 0) > random.randint(15, 25):
-                            emotions_list = list(EMOTIONS.keys())
-                            new_emotion = random.choice(emotions_list)
+                            new_emotion = random.choice(list(EMOTIONS.keys()))
                             config.ETAT["target_emotion"] = new_emotion
                             config.ETAT["last_emotion_switch"] = time.time()
-                            print(f"🎭 Changement d'émotion : {new_emotion}")
-                            
                         target_key = config.ETAT["target_emotion"]
                     else:
                         target_key = current_emotion
-                        
+                    
                     target_data = EMOTIONS.get(target_key, EMOTIONS["joyeux"])
-                    
-                    # --- INTERPOLATION LOGIC ---
-                    # --- AUTO-DRIFT LOGIC (v11.0) ---
-                    if config.ETAT.get("mode_auto", False):
-                        curr_time = time.time()
-                        start_time = config.ETAT.get("auto_start_time", 0)
-                        intro_duration = 12.0 # Slow build up over 12 seconds
-                        
-                        # A. INTRO MODE (Progressive Intensity)
-                        # If we are in the intro phase, we scale the intensity from 0 to Target
-                        if curr_time - start_time < intro_duration:
-                            factor = (curr_time - start_time) / intro_duration
-                            target_i = target_data.get("intensite", 50)
-                            # Apply scaled intensity
-                            config.ETAT["intensite"] = max(10, target_i * factor) 
-                            # Also force BPM to start slower? Maybe not needed.
-                        
-                        # B. PARAMETER DRIFT (Existing but tuned)
-                        # v14.3: Wandering Tempo (Micro-Drift)
-                        current_bpm = config.ETAT.get("bpm", 120)
-                        base_target_bpm = target_data.get("bpm", 120)
-                        
-                        # Initialize or update micro-drift target
-                        if "bpm_micro_drift" not in config.ETAT:
-                             config.ETAT["bpm_micro_drift"] = 0
-                             config.ETAT["last_drift_update"] = 0
-                        
-                        # Update drift target every 10-20 seconds
-                        if curr_time - config.ETAT.get("last_drift_update", 0) > random.randint(10, 20):
-                            # New random offset between -10 and +10 BPM
-                            offset = random.randint(-15, 15) # Slightly wider range for more life
-                            config.ETAT["bpm_micro_drift"] = offset
-                            config.ETAT["last_drift_update"] = curr_time
-                            # print(f"🕰️ Tempo Drift: Target is now {base_target_bpm + offset} BPM")
-                        
-                        target_bpm = base_target_bpm + config.ETAT["bpm_micro_drift"]
-                            
-                        # Smoothly drift towards the new wandering target
-                        if abs(current_bpm - target_bpm) > 0.5:
-                            config.ETAT["bpm"] += (target_bpm - current_bpm) * 0.05 # Slightly faster reaction to drift
-                            
-                        current_i = config.ETAT["intensite"]
-                        target_i = target_data.get("intensite", 50)
-                        # Only drift intensity if NOT in intro mode (or if intro finished)
-                        if curr_time - start_time >= intro_duration:
-                            if abs(current_i - target_i) > 1:
-                                config.ETAT["intensite"] += (target_i - current_i) * 0.02
-
-                        # C. DYNAMIC INSTRUMENT MANAGEMENT
-                        # Only check every 4 seconds to avoid chaos
-                        if curr_time - config.ETAT.get("last_inst_update", 0) > 4.0:
-                            config.ETAT["last_inst_update"] = curr_time
-                            
-                            actifs = config.ETAT.get("instruments_actifs", [])
-                            preferred = target_data.get("preferred", [])
-                            
-                            # DECISION: ADD Instrument
-                            # - If very few (<3), High chance
-                            # - If intro (<10s) and < 3, High chance
-                            # - Random drift chance
-                            should_add = False
-                            if len(actifs) < 2: should_add = True
-                            elif len(actifs) < 5 and random.random() < 0.3: should_add = True
-                            elif random.random() < 0.1: should_add = True
-                            
-                            if should_add:
-                                # Pick a preferred one not currently active
-                                candidates = [i for i in preferred if i not in actifs]
-                                # If no preferred candidates, pick any available valid instrument
-                                if not candidates and random.random() < 0.2:
-                                    candidates = [i for i in instruments.keys() if i not in actifs]
-                                
-                                if candidates:
-                                    new_inst = random.choice(candidates)
-                                    actifs.append(new_inst)
-                                    # print(f"➕ Auto-Drift: Adding {new_inst}")
-                                    config.ETAT["instruments_actifs"] = actifs
-                                    config.ETAT["ui_needs_update"] = True # Signal UI
-
-                            # DECISION: REMOVE Instrument
-                            # - If too many (>6), High Chance
-                            # - Random drift chance
-                            should_remove = False
-                            if len(actifs) > 8: should_remove = True
-                            elif len(actifs) > 5 and random.random() < 0.2: should_remove = True
-                            elif len(actifs) > 2 and random.random() < 0.05: should_remove = True
-                            
-                            if should_remove:
-                                # Prioritize removing NON-preferred instruments
-                                non_pref = [i for i in actifs if i not in preferred]
-                                if non_pref:
-                                    bye = random.choice(non_pref)
-                                else:
-                                    bye = random.choice(actifs)
-                                
-                                actifs.remove(bye)
-                                # print(f"➖ Auto-Drift: Removing {bye}")
-                                config.ETAT["instruments_actifs"] = actifs
-                                config.ETAT["ui_needs_update"] = True # Signal UI
-
-                    
-                    
                     gamme = target_data["gamme"]
                     
-                    # --- PLAYBACK LOGIC ---
-                    # v13.0: Hybrid Engine (MIDI vs Audio Loop)
-                    # If in Elements/Seasons/Atmos, we use Audio Loops (GlobalAudioPlayer)
-                    # So we SKIP MIDI generation here, UNLESS we are in Orchestra mode (or mixed)
-                    current_collection = config.ETAT.get("collection")
-                    if current_collection in ["elements", "saisons", "atmos"]:
-                        # MIDI Silent Mode (Audio Loop is playing in background via interface.py)
-                        wait(1.0)
-                        continue
-
+                    # ── CONDUCTOR UPDATE (Perlin-driven state) ──
                     bpm = config.ETAT.get("bpm", 120)
-                    intensite = config.ETAT["intensite"]
-                    chaos = config.ETAT["chaos"]
-                    
-                    # BPM to Seconds calculation
-                    # We assume quarter note beat. attente is duration of 1 step.
-                    # Base speed: 
                     attente = 60.0 / bpm
-                    
-                    # Humanize slightly less on rhythm to keep it tight, but still organic
                     attente = humaniser(attente, 0.05)
                     
-                    # Determine next note based on random walk
-                    direction = random.choice([-1, 1])
-                    if random.random() * 100 < chaos: direction *= -1
-                    saut = 1
-                    if random.random() * 100 < chaos: saut = random.randint(2, 4)
+                    if config.ETAT.get("mode_auto", False):
+                        conductor.update(attente, target_data)
                     
-                    try:
-                        curr = min(gamme, key=lambda x: abs(x-note_courante))
-                        curr_idx = gamme.index(curr)
-                        new_idx = max(0, min(curr_idx + (direction*saut), len(gamme)-1))
-                        note_brute = gamme[new_idx]
-                    except: note_brute = 60
-                    
-                    # Note brute before emotional pitch processing
-                    note_courante = note_brute
-                    
-                    # v14.1 Smart Polyphony & Cooldowns
-                    
-                    # Polyphonic Instruments configuration (Sustain Pedal Allowed)
-                    POLYPHONIC_INSTRUMENTS = ["piano", "harpe", "guitare", "batterie", "celesta", "marimba", "orgue", "timbales"]
-                    
+                    intensite = config.ETAT.get("intensite", 50)
                     current_time = time.time()
-                    active_count = len(actifs)
-                    density_limit = 8
-
-                    # Play all selected instruments (Polyrhythm chance)
-                    for inst_name in actifs:
-                        if inst_name in instruments:
-                            
-                            # v9.1 Filter: Skip excluded instruments for this emotion
-                            if inst_name in target_data.get("excluded", []):
+                    
+                    # ── PLAY ALL ACTIVE INSTRUMENTS ──
+                    for inst_name in list(actifs):
+                        if inst_name not in instruments:
+                            continue
+                        if inst_name in target_data.get("excluded", []):
+                            continue
+                        
+                        inst = instruments[inst_name]
+                        
+                        # ── PHRASING STATE LOGIC ──
+                        # Sustained instruments: check if we should start/continue a phrase
+                        is_sustained = inst_name in SUSTAINED_INSTRUMENTS
+                        is_plucked = inst_name in PLUCKED_INSTRUMENTS and inst_name not in SUSTAINED_INSTRUMENTS
+                        is_percussive = inst_name in PERCUSSIVE_INSTRUMENTS and inst_name not in PLUCKED_INSTRUMENTS
+                        
+                        in_phrase = conductor.is_in_phrase(inst_name)
+                        
+                        if is_sustained and not in_phrase:
+                            # Not in a phrase: should we start one?
+                            if conductor.should_start_phrase(inst_name):
+                                conductor.begin_phrase(inst_name)
+                                in_phrase = True
+                            else:
+                                # Not playing — sustained instruments are silent between phrases
                                 continue
-                                
-                            # v9.1 Filter: Boost presence of preferred instruments
-                            threshold = 0.7
-                            if inst_name in target_data.get("preferred", []):
-                                threshold = 0.9 # Higher chance to play
-                            
-                            # v14.2 AUTO-DRIFT REFINEMENTS (Intro & Dynamics)
-                            current_intro_factor = 1.0 # Default full active
-                            
-                            if config.ETAT.get("mode_auto", False):
-                                intro_start = config.ETAT.get("auto_start_time", 0)
-                                intro_len = 30.0 # Slow build over 30s (User Request)
-                                if current_time - intro_start < intro_len:
-                                    # Linear ramp 0.1 -> 1.0
-                                    progress = (current_time - intro_start) / intro_len
-                                    current_intro_factor = max(0.1, progress)
-                                    
-                                    # Scale probability (Density Ramp)
-                                    threshold = threshold * current_intro_factor
-                            
-                            # v14.2 DYNAMIC EXPRESSION (Independent Volume Drift)
-                            
-                            # Drift logic (slow breathing)
-                            current_dyn = config.INST_DYNAMICS.get(inst_name, 1.0)
-                            if random.random() < 0.1: # Update occasionally
-                                drift = random.uniform(-0.05, 0.05)
-                                current_dyn = max(0.4, min(1.3, current_dyn + drift)) # Range 0.4 to 1.3
-                                config.INST_DYNAMICS[inst_name] = current_dyn
-                            
-                            # 1. COOLDOWN CHECK
-                            last_end = config.COOLDOWNS.get(inst_name, 0)
-                            is_polyphonic = inst_name in POLYPHONIC_INSTRUMENTS
-                            
-                            # Monophonic: Strict overlap prevention
-                            if not is_polyphonic:
-                                if current_time < last_end - 0.1: # Allow slight legato (0.1s overlap)
-                                    continue # Skip note, instrument is busy
-                            
-                            # 2. DENSITY CHECK
-                            if active_count > density_limit:
-                                skip_chance = 0.5 if is_polyphonic else 0.8
-                                if random.random() < skip_chance: continue
-
-                            # Intro Density Check override (extra thinning at start)
-                            if current_intro_factor < 0.5 and random.random() > current_intro_factor:
+                        elif not is_sustained:
+                            # Non-sustained: use probability-based play logic
+                            if not conductor.should_play(inst_name, target_data):
                                 continue
-
-                            if random.random() < threshold: 
-                                inst = instruments[inst_name]
-                                vol = 0.2 + (intensite / 200.0)
-                                vol = humaniser(vol, 0.15) 
-                                
-                                # Apply Dynamic Expression (Independent Volume)
-                                vol = vol * current_dyn
-                                
-                                # Apply Intro Volume Ramp
-                                if current_intro_factor < 1.0:
-                                    vol = vol * current_intro_factor
-                                
-                                # Pitch Logic
-                                pitch = note_courante + target_data.get("pitch_offset", 0)
-                                
-                                # Default instrument offsets (Bass goes low, Flute goes high)
-                                if inst_name in ["contrebasse", "basse", "violoncelle", "timbales", "cuivres", "batterie"]: pitch -= 12
-                                if inst_name in ["flute", "violon", "piccolo", "hautbois", "trompette"]: pitch += 12
-                                
-                                # v9.1 Logic: Pitch Clamping for Emotion Register
-                                min_p = target_data.get("min_pitch", 0)
-                                max_p = target_data.get("max_pitch", 127)
-                                
-                                # Smart octave shift to fit range
-                                while pitch < min_p: pitch += 12
-                                while pitch > max_p: pitch -= 12
-                                
-                                # Percussion Mapping (Drums) - unaffected by pitch logic usually
-                                if inst_name == "batterie":
-                                    pitch = random.choice([35, 38, 42, 46]) # Kick, Snare, HiHats
-                                
-                                # 4. SUSTAIN PEDAL LOGIC
-                                # Decouple Sound Duration from Rhythm
-                                rhythm_duration = attente
-                                sound_duration = attente
-                                
-                                if is_polyphonic:
-                                    # Sustain Pedal Effect: Note rings longer (User Request v14.4)
-                                    # Multiplier increased to 3.0 - 6.0 for deeper atmosphere
-                                    sound_duration = rhythm_duration * random.uniform(3.0, 6.0)
-                                    # Cooldown is just the rhythm slot (free up immediately for next chord note)
-                                    config.COOLDOWNS[inst_name] = current_time + rhythm_duration
-                                else:
-                                    # Monophonic: Varied Legato / Phrasing (User Request v14.4)
-                                    # Longer notes: 2.5x to 8.0x rhythm duration
-                                    duration_mult = random.uniform(2.5, 8.0) 
-                                    sound_duration = rhythm_duration * duration_mult
-                                    
-                                    # Cooldown matches sound duration to enforce monophony
-                                    config.COOLDOWNS[inst_name] = current_time + (sound_duration * 0.95)
-                                
-                                # Anti-Mud check for Polyphonic: Don't repeat SAME pitch if ringing
-                                active_notes = config.ACTIVE_NOTES.get(inst_name, {})
-                                if pitch in active_notes and active_notes[pitch] > current_time:
-                                     # Note still ringing. 
-                                     if random.random() < 0.8: continue # Skip to avoid phasing
-                                
-                                # Update registry
-                                active_notes[pitch] = current_time + sound_duration
-                                config.ACTIVE_NOTES[inst_name] = active_notes
-                                
-                                # Clean up old notes in registry
-                                config.ACTIVE_NOTES[inst_name] = {k:v for k,v in active_notes.items() if v > current_time}
-                                
-                                # v14.4 ENVELOPE LOGIC (Swell & Fade)
-                                final_vol = vol
-                                if sound_duration > 1.5:
-                                    # Create a dynamic envelope for long notes
-                                    # Soft Attack -> Swell -> Fade Out
-                                    peak_vol = min(1.0, vol * 1.3)
-                                    end_vol = 0.0 if not is_polyphonic else vol * 0.2
-                                    
-                                    # Curve shapes: 2 (convex start), -2 (concave end)
-                                    try:
-                                        final_vol = Envelope.from_levels(
-                                            [vol * 0.1, peak_vol, end_vol],
-                                            [sound_duration * 0.4, sound_duration * 0.6],
-                                            curve_shapes=[3, -3]  # type: ignore[call-arg]
-                                        )
-                                    except:
-                                        final_vol = vol # Fallback
-                                
-                                inst.play_note(pitch, final_vol, sound_duration, blocking=False)
+                        
+                        # ── COOLDOWN CHECK ──
+                        last_end = config.COOLDOWNS.get(inst_name, 0)
+                        if is_sustained and in_phrase:
+                            # Legato: allow heavy overlap (next note starts before prev ends)
+                            # Only skip if we're very early in the current note
+                            if current_time < last_end - 1.0:
+                                continue  # Still too early, wait for overlap window
+                        elif not is_sustained:
+                            if current_time < last_end:
+                                continue  # Instrument busy
+                        
+                        # ── PITCH (Voice Leading via Conductor) ──
+                        if inst_name == "batterie":
+                            pitch = random.choice([35, 38, 42, 46, 49])
+                        else:
+                            pitch = conductor.voice_lead(inst_name, gamme)
+                        
+                        # ── DURATION (Conductor-driven) ──
+                        sound_duration = conductor.suggest_duration(inst_name, attente, loop_wait=attente)
+                        
+                        # ── COOLDOWN UPDATE ──
+                        if is_sustained and in_phrase:
+                            # Legato overlap: next note available at 70-90% of duration
+                            legato_wait = conductor.get_legato_wait(inst_name, sound_duration)
+                            config.COOLDOWNS[inst_name] = current_time + legato_wait
+                        elif inst_name in PLUCKED_INSTRUMENTS:
+                            config.COOLDOWNS[inst_name] = current_time + sound_duration * 0.9
+                        else:
+                            config.COOLDOWNS[inst_name] = current_time + sound_duration
+                        
+                        # ── ANTI-MUD (don't repeat ringing pitch) ──
+                        active_notes = config.ACTIVE_NOTES.get(inst_name, {})
+                        if pitch in active_notes and active_notes[pitch] > current_time:
+                            if random.random() < 0.7:
+                                continue
+                        active_notes[pitch] = current_time + sound_duration
+                        config.ACTIVE_NOTES[inst_name] = {k: v for k, v in active_notes.items() if v > current_time}
+                        
+                        # ── VOLUME ──
+                        vol = 0.15 + (intensite / 250.0)
+                        vol = conductor.humanize_velocity(vol, 0.06)
+                        vol = min(1.0, max(0.05, vol))
+                        
+                        # ── SMART ENVELOPE (per instrument family) ──
+                        final_vol = conductor.get_smart_envelope(inst_name, vol, sound_duration)
+                        
+                        # ── PLAY NOTE ──
+                        try:
+                            inst.play_note(pitch, final_vol, sound_duration, blocking=False)
+                        except Exception:
+                            pass
+                        
+                        # End phrase if time is up
+                        conductor.end_phrase_if_done(inst_name)
                     
                     wait(attente)
                     continue
