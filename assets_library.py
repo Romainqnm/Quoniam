@@ -97,7 +97,7 @@ SVG_ORGAN = """
 </svg>
 """
 
-# v19.0 NEW INSTRUMENTS
+# v1.19.2 NEW INSTRUMENTS
 SVG_VIOLA = """
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
   <path d="M14 5c0-1.5-1.5-2.5-3-2.5S8.5 3.5 8.5 5c0 1.5 1 2.5 2 3l-.4 2H8.5c-1.5 0-2.5 1-2.5 2.5v6c0 1.5 1 2.5 2.5 2.5h5c1.5 0 2.5-1 2.5-2.5v-6c0-1.5-1-2.5-2.5-2.5h-1.6l-.4-2c1-.5 2-1.5 2-3zm-3 10c-.83 0-1.5-.67-1.5-1.5S10.17 12 11 12s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>

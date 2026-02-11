@@ -1,4 +1,4 @@
-# ai_conductor.py - AI CONDUCTOR ENGINE v19.1 (Organic Soul & Phrasing)
+# ai_conductor.py - AI CONDUCTOR ENGINE v1.19.2 (Organic Soul & Phrasing)
 """
 Chef d'orchestre virtuel basé sur le bruit de Perlin.
 Gère la cohérence harmonique, le réalisme instrumental,
@@ -82,7 +82,7 @@ PLUCKED_INSTRUMENTS = {
 
 class AIConductor:
     """
-    Chef d'orchestre IA pour Quoniam v19.0 — Organic Soul.
+    Chef d'orchestre IA pour Quoniam v1.19.2 — Organic Soul.
 
     Three core concepts:
     1. PHRASING STATE: Legato instruments enter long phrases (15-40s)

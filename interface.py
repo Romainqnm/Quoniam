@@ -12,7 +12,7 @@ import math # v13.3 fix for visualizer
 
 def main(page: ft.Page):
     # --- CONFIGURATION ---
-    page.title = "QUONIAM v17.0"
+    page.title = "QUONIAM v1.19.2"
 
     # Lock to serialize all Flet .update() calls (prevents concurrent diff crash)
     _ui_lock = threading.Lock()
@@ -35,8 +35,8 @@ def main(page: ft.Page):
     page.bgcolor = "#00000000"
 
     # --- INITIALISATION AUDIO (Séquentielle) ---
-    print("Lancement v17.0 Kaleidoscope...")
-    # PALETTES DE COULEURS (v17.0 — deep, desaturated backgrounds for kaleidoscope contrast)
+    print("Lancement v1.19.2 Kaleidoscope & Particles...")
+    # PALETTES DE COULEURS (v1.19.2 — deep, desaturated backgrounds for kaleidoscope contrast)
     COLORS_ACCUEIL  = ["#08060f", "#1a1535", "#12101e"]
     COLORS_ELEMENTS = ["#1a0505", "#2a0a0a", "#1f0808"]   # Deep ember
     COLORS_SAISONS  = ["#051208", "#0a1f0e", "#081a0b"]   # Deep forest
@@ -173,7 +173,7 @@ def main(page: ft.Page):
         animate_rotation=ft.Animation(1000, ft.AnimationCurve.LINEAR),
     )
 
-    # --- KALEIDOSCOPE VISUALIZER v17.0 ---
+    # --- KALEIDOSCOPE VISUALIZER v1.19.2 ---
     # Unified color palettes (6 colors per preset for layered blending)
     KALEIDOSCOPE_COLORS = {
         "home": ["#4dd0e1", "#00bcd4", "#0097a7", "#ffffff", "#b0bec5", "#cfd8dc"],
@@ -477,8 +477,183 @@ def main(page: ft.Page):
 
             return shapes
 
+    # ═══════════════════════════════════════════════════════════
+    #  PARTICLE SYSTEM v1.19.2
+    # ═══════════════════════════════════════════════════════════
+
+    class ParticleSystem:
+        """
+        Ambient particle system synced with KaleidoscopeEngine.
+        Particles drift upward with sinusoidal wobble, fade in/out,
+        and use the current kaleidoscope palette colors.
+        """
+
+        def __init__(self, engine: KaleidoscopeEngine):
+            self.engine = engine
+            self.particles: list[dict] = []
+            self.max_particles = 22
+            self.spawn_rate = 0.35  # seconds between spawns
+            self._last_spawn = 0.0
+            self._shapes = ["circle", "diamond", "star", "dot"]
+
+        def _spawn_particle(self, t: float) -> dict:
+            """Create a new particle with randomized properties."""
+            palette = self.engine._palette
+            color = random.choice(palette) if palette else "#ffffff"
+            # Slight hue variation: shift hex color brightness
+            shape = random.choice(self._shapes)
+            size = random.uniform(2.0, 6.0)
+            lifespan = random.uniform(3.0, 5.5)
+
+            # Spawn zone: bottom 40% of canvas, spread horizontally
+            w, h = self.engine.width, self.engine.height
+            x = random.uniform(w * 0.1, w * 0.9)
+            y = random.uniform(h * 0.55, h * 0.95)
+
+            return {
+                "x": x, "y": y,
+                "vx": random.uniform(-8, 8),       # horizontal drift speed
+                "vy": random.uniform(-25, -12),     # upward speed (negative = up)
+                "size": size,
+                "color": color,
+                "shape": shape,
+                "born": t,
+                "lifespan": lifespan,
+                "wobble_freq": random.uniform(1.5, 3.5),   # Hz
+                "wobble_amp": random.uniform(8, 25),        # px
+                "phase": random.uniform(0, 2 * math.pi),
+                "rotation": random.uniform(0, 2 * math.pi),
+                "rot_speed": random.uniform(-0.8, 0.8),
+            }
+
+        def _particle_opacity(self, age: float, lifespan: float) -> float:
+            """Fade in (15%) → full → fade out (25%)."""
+            if age < 0:
+                return 0.0
+            ratio = age / lifespan
+            if ratio < 0.15:
+                return ratio / 0.15  # Fade in
+            elif ratio > 0.75:
+                return max(0.0, (1.0 - ratio) / 0.25)  # Fade out
+            return 1.0
+
+        def _render_circle(self, x, y, size, color, opacity):
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.7, opacity * 0.6), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            return cv.Circle(x, y, max(1, size), paint=paint)
+
+        def _render_diamond(self, x, y, size, angle, color, opacity):
+            s = max(size, 1.5)
+            ca, sa = math.cos(angle), math.sin(angle)
+            pa, pb = math.cos(angle + math.pi / 2), math.sin(angle + math.pi / 2)
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.65, opacity * 0.55), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            return cv.Path(
+                elements=[
+                    cv.Path.MoveTo(x + ca * s * 1.8, y + sa * s * 1.8),
+                    cv.Path.LineTo(x + pa * s * 0.7, y + pb * s * 0.7),
+                    cv.Path.LineTo(x - ca * s * 1.8, y - sa * s * 1.8),
+                    cv.Path.LineTo(x - pa * s * 0.7, y - pb * s * 0.7),
+                    cv.Path.Close(),
+                ],
+                paint=paint,
+            )
+
+        def _render_star(self, x, y, size, angle, color, opacity):
+            """4-pointed star."""
+            s = max(size, 1.5)
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.6, opacity * 0.5), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            points = []
+            for i in range(8):
+                a = angle + i * (math.pi / 4)
+                r = s * 1.6 if i % 2 == 0 else s * 0.5
+                points.append((x + math.cos(a) * r, y + math.sin(a) * r))
+            elements = [cv.Path.MoveTo(points[0][0], points[0][1])]
+            for px, py in points[1:]:
+                elements.append(cv.Path.LineTo(px, py))
+            elements.append(cv.Path.Close())
+            return cv.Path(elements=elements, paint=paint)
+
+        def _render_dot(self, x, y, size, color, opacity):
+            """Tiny bright dot — like a distant sparkle."""
+            paint = ft.Paint(
+                color=ft.Colors.with_opacity(min(0.85, opacity * 0.75), color),
+                style=ft.PaintingStyle.FILL,
+                anti_alias=True,
+            )
+            return cv.Circle(x, y, max(0.8, size * 0.4), paint=paint)
+
+        def generate_particles(self) -> list:
+            """Update particles and return cv shapes."""
+            t = time.time()
+            intensity = config.ETAT.get("intensite", 30)
+            bpm = config.ETAT.get("bpm", 120)
+
+            # Adaptive max particles: more when intensity is high
+            self.max_particles = int(15 + (intensity / 100.0) * 12)
+
+            # Spawn new particles
+            if t - self._last_spawn > self.spawn_rate and len(self.particles) < self.max_particles:
+                self.particles.append(self._spawn_particle(t))
+                self._last_spawn = t
+                # Occasionally spawn 2 at once for variety
+                if random.random() < 0.3 and len(self.particles) < self.max_particles:
+                    self.particles.append(self._spawn_particle(t))
+
+            # BPM-synced pulse: particles subtly breathe
+            bpm_pulse = 0.5 + 0.5 * math.sin(t * (bpm / 60.0) * math.pi)
+
+            # Update and render
+            shapes = []
+            alive = []
+            for p in self.particles:
+                age = t - p["born"]
+                if age > p["lifespan"]:
+                    continue  # Dead particle
+
+                alive.append(p)
+                opacity = self._particle_opacity(age, p["lifespan"])
+                if opacity <= 0.02:
+                    continue
+
+                # Position update: drift + sinusoidal wobble
+                dt = age
+                wobble_x = math.sin(dt * p["wobble_freq"] + p["phase"]) * p["wobble_amp"]
+                x = p["x"] + p["vx"] * dt + wobble_x
+                y = p["y"] + p["vy"] * dt
+
+                # Size pulsation synced with BPM
+                size = p["size"] * (0.85 + bpm_pulse * 0.3)
+
+                angle = p["rotation"] + p["rot_speed"] * dt
+
+                # Render based on shape
+                shape_type = p["shape"]
+                if shape_type == "circle":
+                    shapes.append(self._render_circle(x, y, size, p["color"], opacity))
+                elif shape_type == "diamond":
+                    shapes.append(self._render_diamond(x, y, size, angle, p["color"], opacity))
+                elif shape_type == "star":
+                    shapes.append(self._render_star(x, y, size, angle, p["color"], opacity))
+                elif shape_type == "dot":
+                    shapes.append(self._render_dot(x, y, size, p["color"], opacity))
+
+            self.particles = alive
+            return shapes
+
     # --- KALEIDOSCOPE CANVAS ---
     kaleidoscope_engine = KaleidoscopeEngine()
+    particle_system = ParticleSystem(kaleidoscope_engine)
 
     def on_canvas_resize(e: cv.CanvasResizeEvent):
         kaleidoscope_engine.resize(e.width, e.height)
@@ -493,7 +668,9 @@ def main(page: ft.Page):
         while True:
             try:
                 shapes = kaleidoscope_engine.generate_frame(focus_mode)
-                kaleidoscope_canvas.shapes = shapes
+                # Overlay particles on top of kaleidoscope
+                particles = particle_system.generate_particles()
+                kaleidoscope_canvas.shapes = shapes + particles
                 safe_update(kaleidoscope_canvas)
             except Exception:
                 pass
@@ -659,7 +836,7 @@ def main(page: ft.Page):
         animate_opacity=ft.Animation(500, ft.AnimationCurve.EASE_IN_OUT)
     )
 
-    # --- FOCUS MODE (v17.0 — Kaleidoscope) ---
+    # --- FOCUS MODE (v1.19.2 — Kaleidoscope & Particles) ---
     focus_mode = False
 
     def toggle_focus(e):
@@ -696,7 +873,7 @@ def main(page: ft.Page):
     main_layout_stack = ft.Stack(
         [
             bg_gradient,
-            kaleidoscope_canvas,   # v17.0 Canvas kaleidoscope visualizer
+            kaleidoscope_canvas,   # v1.19.2 Canvas kaleidoscope + particles
             content_layer,
             focus_exit_hint,
         ],
@@ -1105,7 +1282,7 @@ def main(page: ft.Page):
 
             ft.Container(expand=True),
             ft.Row([
-                ft.Text("v17.0 Kaleidoscope", size=10, color="#44ffffff"),
+                ft.Text("v1.19.2 Kaleidoscope", size=10, color="#44ffffff"),
                 ft.Container(width=15),
                 btn_quit,
             ], alignment=ft.MainAxisAlignment.CENTER, spacing=5),
@@ -1270,7 +1447,7 @@ def main(page: ft.Page):
                 ft.Container(expand=True),
                 ft.Row([
                     ft.Text("LIQUID SOUL", size=18, weight=ft.FontWeight.BOLD, color="white", font_family="Verdana"),
-                    ft.Text("v17.0", size=10, color="#88ffffff", italic=True)
+                    ft.Text("v1.19.2", size=10, color="#88ffffff", italic=True)
                 ], spacing=5),
                 ft.Container(expand=True),
                 # We replace the top_bar (navigation) with audio controls here? 
@@ -1363,7 +1540,7 @@ def main(page: ft.Page):
         svg_content = mapping.get(icon_key, assets.SVG_NOTE)
         b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
 
-        # v17.0 Liquid Glass preset button
+        # v1.19.2 Liquid Glass preset button
         icon_with_glow = ft.Container(
             content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
                              width=32, height=32,
@@ -1652,7 +1829,7 @@ def main(page: ft.Page):
              svg_content = get_emotion_asset(val)
              b64 = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
 
-             # v17.0 Liquid Glass emotion button
+             # v1.19.2 Liquid Glass emotion button
              icon_glow = ft.Container(
                  content=ft.Image(src=f"data:image/svg+xml;base64,{b64}",
                                   width=20, height=20,
@@ -2050,7 +2227,7 @@ def main(page: ft.Page):
     thread_fond.start()
 
 if __name__ == "__main__":
-    print("Lancement v17.0 Kaleidoscope...")
+    print("Lancement v1.19.2 Kaleidoscope...")
 
     # Initialiser et démarrer le moteur audio
     audio_engine = QuoniamAudioEngine()

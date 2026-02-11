@@ -1,4 +1,4 @@
-# main.py - MOTEUR AUDIO v19.1 (ORGANIC SOUL + PHRASING)
+# main.py - MOTEUR AUDIO v1.19.2 (ORGANIC SOUL + PHRASING)
 from scamp import Session, wait, fork, Envelope
 import random
 import os
@@ -190,7 +190,7 @@ def main():
                 wait(0.1)
             wait(duree * 0.8)
 
-    # --- AI CONDUCTOR (v19.0) ---
+    # --- AI CONDUCTOR (v1.19.2) ---
     conductor = AIConductor()
     print("🎼 AI Conductor initialized (Organic Soul & Phrasing)")
 
@@ -206,7 +206,7 @@ def main():
                 if config.ETAT["mode_auto"]: pass 
 
                 # ═══════════════════════════════════════════════════════
-                #  ORCHESTRA MODE v19.0 — ORGANIC SOUL & PHRASING
+                #  ORCHESTRA MODE v1.19.2 — ORGANIC SOUL & PHRASING
                 # ═══════════════════════════════════════════════════════
                 if config.ETAT.get("mode_orchestre", False):
                     actifs = config.ETAT.get("instruments_actifs", [])

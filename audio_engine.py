@@ -1,4 +1,4 @@
-# audio_engine.py - MOTEUR AUDIO SCAMP REFACTORISÉ v19.1
+# audio_engine.py - MOTEUR AUDIO SCAMP REFACTORISÉ v1.19.2
 """
 Moteur audio procédural basé sur SCAMP.
 Génère des nappes fluides avec enveloppes dynamiques et tuilage.
@@ -42,7 +42,7 @@ class QuoniamAudioEngine:
 
     def _init_scamp_session(self):
         """Initialise la session SCAMP et charge les instruments."""
-        print("--- DÉMARRAGE LIQUID SOUL v15.0 (Nappes Fluides) ---")
+        print("--- DÉMARRAGE LIQUID SOUL v1.19.2 (Nappes Fluides) ---")
 
         if os.path.exists(self.soundfont_path):
             print(f"✅ SoundFont détectée : {self.soundfont_path}")
@@ -382,7 +382,7 @@ class QuoniamAudioEngine:
 
     def _play_orchestra_mode(self):
         """
-        Gère la lecture en mode orchestre avec AI Conductor v19.0.
+        Gère la lecture en mode orchestre avec AI Conductor v1.19.2.
         ORGANIC SOUL & PHRASING + CONTINUUM MÉLODIQUE
         """
         actifs = config.ETAT.get("instruments_actifs", [])
