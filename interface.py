@@ -674,7 +674,7 @@ def main(page: ft.Page):
                 safe_update(kaleidoscope_canvas)
             except Exception:
                 pass
-            time.sleep(0.05)  # 20 FPS
+            time.sleep(0.033)  # ~30 FPS
 
 
 
@@ -944,7 +944,7 @@ def main(page: ft.Page):
 
                     safe_update(container_icone)
                     
-                    time.sleep(0.05) # fast loop for smooth animation
+                    time.sleep(0.033)  # ~30 FPS
                 else:
                     time.sleep(1.0)
             except Exception as e:
