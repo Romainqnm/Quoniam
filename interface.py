@@ -411,6 +411,10 @@ def main(page: ft.Page):
 
         def _make_shape(self, shape_type, cx, cy, radius, angle, color, opacity, scale):
             size = radius * 0.18 * scale
+            # Low quality: replace complex path shapes with simple circles
+            quality = config.SETTINGS.get("visual_quality", "high")
+            if quality == "low" and shape_type not in ("circle", "diamond"):
+                shape_type = "circle"
             if shape_type == "circle":
                 return self._shape_circle(cx, cy, size, color, opacity)
             elif shape_type == "petal":
@@ -434,6 +438,7 @@ def main(page: ft.Page):
             bpm = config.ETAT.get("bpm", 120)
             intensity = config.ETAT.get("intensite", 30)
             vitesse = config.ETAT.get("vitesse", 50)
+            quality = config.SETTINGS.get("visual_quality", "high")
 
             bpm_factor = bpm / 60.0
             breath = math.sin(t * bpm_factor * math.pi)
@@ -443,6 +448,9 @@ def main(page: ft.Page):
             self.global_angle += self._rotation_speed * speed_mult
 
             visible_count = self._focus_layers if is_focus else self._normal_layers
+            # Quality: low reduces layers, high keeps all
+            if quality == "low":
+                visible_count = max(2, visible_count // 2)
             base_opacity = 0.22 if is_focus else 0.10
             max_opacity = 0.42 if is_focus else 0.22
 
@@ -505,8 +513,12 @@ def main(page: ft.Page):
             """Create a new particle with randomized properties."""
             palette = self.engine._palette
             color = random.choice(palette) if palette else "#ffffff"
-            # Slight hue variation: shift hex color brightness
-            shape = random.choice(self._shapes)
+            # Low quality: only simple shapes; high: all shapes
+            quality = config.SETTINGS.get("visual_quality", "high")
+            if quality == "low":
+                shape = random.choice(["circle", "dot"])
+            else:
+                shape = random.choice(self._shapes)
             size = random.uniform(2.0, 6.0)
             lifespan = random.uniform(3.0, 5.5)
 
@@ -603,9 +615,16 @@ def main(page: ft.Page):
             t = time.time()
             intensity = config.ETAT.get("intensite", 30)
             bpm = config.ETAT.get("bpm", 120)
+            quality = config.SETTINGS.get("visual_quality", "high")
 
             # Adaptive max particles: more when intensity is high
-            self.max_particles = int(15 + (intensity / 100.0) * 12)
+            base_particles = int(15 + (intensity / 100.0) * 12)
+            if quality == "low":
+                self.max_particles = base_particles // 2
+            elif quality == "high":
+                self.max_particles = int(base_particles * 1.3)
+            else:
+                self.max_particles = base_particles
 
             # Spawn new particles
             if t - self._last_spawn > self.spawn_rate and len(self.particles) < self.max_particles:
@@ -945,9 +964,14 @@ def main(page: ft.Page):
                     
                     container_icone.scale = current_scale
 
-                    # Aura Pulse (Sync with cycle)
-                    glow_shadow.spread_radius = 5 + (intensite/5) * abs(cycle)
-                    glow_shadow.color = ft.Colors.with_opacity(0.3 + (abs(cycle)*0.3), "white")
+                    # Aura Pulse (Sync with cycle) — disabled on low quality
+                    quality = config.SETTINGS.get("visual_quality", "high")
+                    if quality == "low":
+                        glow_shadow.spread_radius = 0
+                        glow_shadow.color = ft.Colors.with_opacity(0, "white")
+                    else:
+                        glow_shadow.spread_radius = 5 + (intensite/5) * abs(cycle)
+                        glow_shadow.color = ft.Colors.with_opacity(0.3 + (abs(cycle)*0.3), "white")
 
                     # Spin for Space Themes (with counter-rotation for inner icon)
                     if config.ETAT.get("preset") in ["espace", "vide", "cyber", "indus"]:
@@ -1421,12 +1445,12 @@ def main(page: ft.Page):
                 ft.Container(height=15),
                 settings_body,
             ], expand=True),
-            width=700,
-            height=520,
+            width=900,
+            height=600,
             bgcolor=ft.Colors.with_opacity(0.85, "#111118"),
             border=ft.Border.all(1, ft.Colors.with_opacity(0.25, "white")),
             border_radius=25,
-            padding=25,
+            padding=30,
             blur=ft.Blur(20, 20),
             shadow=ft.BoxShadow(blur_radius=40, spread_radius=-5, color=ft.Colors.with_opacity(0.5, "black")),
         )
