@@ -434,9 +434,21 @@ if __name__ == "__main__":
     start_audio_engine()
 
     # Import and start GUI on main thread
+    # Import and start GUI on main thread
     try:
         import interface
+        import flet as ft  # <--- AJOUT IMPORTANT
+        
         print("🖥️  Lancement de l'interface graphique...")
+        
+        # C'est LA ligne magique qui manquait :
+        # On lance l'application Flet en lui donnant la fonction main de interface.py
+        ft.app(target=interface.main) 
+        
+    except ImportError as e:
+        print(f"⚠️  Erreur : {e}")
+        print("⚠️  interface.py introuvable ou erreur Flet - Mode audio seul")
+        # ... (le reste de ton code de secours est bon)
         # The GUI will run on the main thread
         # interface.py will call ft.run(main, ...) which blocks here
         # But the music is already running in the background thread
