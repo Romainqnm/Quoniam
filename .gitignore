@@ -13,4 +13,7 @@ env/
 .DS_Store
 FluidR3_GM.sf2
 assets/sounds/
+# PyInstaller
+build/
 dist/
+*.spec
