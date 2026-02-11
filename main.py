@@ -3,6 +3,7 @@ from scamp import Session, wait, fork, Envelope
 import random
 import os
 import time
+import threading
 import config
 import gammes
 from ai_conductor import AIConductor, SUSTAINED_INSTRUMENTS, PLUCKED_INSTRUMENTS, PERCUSSIVE_INSTRUMENTS
@@ -414,7 +415,37 @@ def main():
                 wait(1.0)
 
     fork(gerer_nappe_fond)
-    gerer_melodie()
+
+    # Start melody loop in a daemon thread instead of blocking main thread
+    melody_thread = threading.Thread(target=gerer_melodie, daemon=True)
+    melody_thread.start()
+    print("🎵 Moteur audio démarré en arrière-plan")
+
+    return s  # Return session so GUI can access it if needed
+
+def start_audio_engine():
+    """Start the audio engine in a background thread (non-blocking)."""
+    audio_thread = threading.Thread(target=main, daemon=True)
+    audio_thread.start()
+    return audio_thread
 
 if __name__ == "__main__":
-    main()
+    # Start audio engine in background
+    start_audio_engine()
+
+    # Import and start GUI on main thread
+    try:
+        import interface
+        print("🖥️  Lancement de l'interface graphique...")
+        # The GUI will run on the main thread
+        # interface.py will call ft.run(main, ...) which blocks here
+        # But the music is already running in the background thread
+    except ImportError:
+        print("⚠️  interface.py introuvable - Mode audio seul")
+        # Keep main thread alive if no GUI
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n👋 Arrêt du moteur audio")
+            config.ETAT["actif"] = False
