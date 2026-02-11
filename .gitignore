@@ -13,3 +13,4 @@ env/
 .DS_Store
 FluidR3_GM.sf2
 assets/sounds/
+dist/
