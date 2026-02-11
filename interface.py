@@ -679,7 +679,8 @@ def main(page: ft.Page):
                 safe_update(kaleidoscope_canvas)
             except Exception:
                 pass
-            time.sleep(0.033)  # ~30 FPS
+            fps = config.SETTINGS.get("target_fps", 30)
+            time.sleep(1.0 / max(fps, 1) if fps > 0 else 0.004)
 
 
 
@@ -961,8 +962,9 @@ def main(page: ft.Page):
                             icon_counter_rotate.angle = 0
 
                     safe_update(container_icone)
-                    
-                    time.sleep(0.033)  # ~30 FPS
+
+                    fps = config.SETTINGS.get("target_fps", 30)
+                    time.sleep(1.0 / max(fps, 1) if fps > 0 else 0.004)
                 else:
                     time.sleep(1.0)
             except Exception as e:
@@ -1099,6 +1101,30 @@ def main(page: ft.Page):
     
     btn_play_container.on_click = toggle_play
 
+    # --- i18n HOT-RELOAD SYSTEM (v1.20) ---
+    _i18n_refs: list[tuple[ft.Text, str]] = []
+
+    def tr(key, **kwargs):
+        """Create a ft.Text with translated value and register for hot-reload."""
+        txt = ft.Text(config.T(key), **kwargs)
+        _i18n_refs.append((txt, key))
+        return txt
+
+    def update_language_ui():
+        """Hot-reload: update all registered text controls to current language."""
+        stale = []
+        for i, (txt, key) in enumerate(_i18n_refs):
+            try:
+                txt.value = config.T(key)
+            except Exception:
+                stale.append(i)
+        for i in reversed(stale):
+            _i18n_refs.pop(i)
+        try:
+            safe_update(page)
+        except Exception:
+            pass
+
     # v1.20: Recording toggle
     def toggle_recording(e):
         if not recording_active[0]:
@@ -1152,8 +1178,10 @@ def main(page: ft.Page):
 
     btn_record_container.on_click = toggle_recording
 
-    # v1.20: Settings dialog
+    # v1.20: Premium Settings Modal
     def open_settings_dialog(e):
+        accent = config.SETTINGS.get("accent_color", "#00E5FF")
+
         def on_setting_change(key, value, callback=None):
             config.save_setting(page, key, value)
             if callback:
@@ -1161,88 +1189,254 @@ def main(page: ft.Page):
 
         def apply_fullscreen(value):
             page.window.full_screen = value
-            safe_update(page)
+            page.update()
+
+        def apply_language(value):
+            config.save_setting(page, "language", value)
+            update_language_ui()
+
+        def apply_accent(color):
+            config.save_setting(page, "accent_color", color)
+            nonlocal accent
+            accent = color
+
+        def apply_fps(fps_val):
+            config.save_setting(page, "target_fps", int(fps_val))
 
         def confirm_reset():
             config.reset_all_settings(page)
             main_layout_stack.controls.pop()
             safe_update(page)
-            snack = ft.SnackBar(ft.Text("Settings reset to defaults", color="white"), bgcolor="#ff9800", open=True)
+            snack = ft.SnackBar(ft.Text(config.T("settings_reset"), color="white"), bgcolor="#ff9800", open=True)
             page.overlay.append(snack)
             safe_update(page)
-
-        sw_fullscreen = ft.Switch(
-            value=config.SETTINGS["fullscreen"],
-            active_color="#00E5FF",
-            on_change=lambda e: on_setting_change("fullscreen", e.control.value, apply_fullscreen)
-        )
-        sw_zen_intro = ft.Switch(
-            value=config.SETTINGS["zen_intro"],
-            active_color="#00E5FF",
-            on_change=lambda e: on_setting_change("zen_intro", e.control.value)
-        )
-        dd_quality = ft.Dropdown(
-            value=config.SETTINGS["visual_quality"],
-            options=[ft.dropdown.Option("low"), ft.dropdown.Option("medium"), ft.dropdown.Option("high")],
-            width=120, height=40, text_size=12, color="white", border_color="#44ffffff",
-        )
-        dd_quality.on_select = lambda e: on_setting_change("visual_quality", e.control.value)
-        dd_language = ft.Dropdown(
-            value=config.SETTINGS["language"],
-            options=[ft.dropdown.Option("EN"), ft.dropdown.Option("FR")],
-            width=80, height=40, text_size=12, color="white", border_color="#44ffffff",
-        )
-        dd_language.on_select = lambda e: on_setting_change("language", e.control.value)
-        txt_export = ft.Text(config.SETTINGS["export_folder"], size=11, color="#aaffffff")
-        btn_reset = ft.Container(
-            content=ft.Text("RESET ALL", size=11, color="#ff6b6b", weight=ft.FontWeight.BOLD),
-            on_click=lambda e: confirm_reset(),
-            padding=10, border_radius=10,
-            border=ft.Border.all(1, "#44ff6b6b"), ink=True,
-        )
 
         def close_settings(e):
             main_layout_stack.controls.pop()
             safe_update(page)
 
-        settings_content = ft.Column([
-            ft.Text("IMMERSION", size=11, weight=ft.FontWeight.BOLD, color="#88ffffff"),
-            ft.Row([ft.Text("Fullscreen", size=12, color="white", expand=True), sw_fullscreen]),
-            ft.Row([ft.Text("Zen Intro", size=12, color="white", expand=True), sw_zen_intro]),
-            ft.Row([ft.Text("Visual Quality", size=12, color="white", expand=True), dd_quality]),
-            ft.Divider(height=1, color="#22ffffff"),
-            ft.Text("APP", size=11, weight=ft.FontWeight.BOLD, color="#88ffffff"),
-            ft.Row([ft.Text("Language", size=12, color="white", expand=True), dd_language]),
-            ft.Row([ft.Text("Export Folder", size=12, color="white", expand=True), txt_export]),
-            ft.Container(height=10),
-            ft.Row([btn_reset, ft.Container(expand=True),
-                    ft.Container(content=ft.Text("CLOSE", color="#88ffffff"), on_click=close_settings, padding=10, ink=True)
-            ]),
-        ], spacing=8, width=320, scroll=ft.ScrollMode.AUTO)
+        # --- Helper: section card ---
+        def section_card(icon_svg, icon_color, title_key, gradient_colors, controls_list):
+            return ft.Container(
+                content=ft.Column([
+                    ft.Row([
+                        get_ui_icon(icon_svg, color=icon_color, size=22),
+                        ft.Text(config.T(title_key), size=14, weight=ft.FontWeight.BOLD, color="white"),
+                    ], spacing=10),
+                    ft.Container(height=8),
+                    ft.Column(controls_list, spacing=12),
+                ]),
+                padding=20,
+                border_radius=20,
+                gradient=ft.LinearGradient(
+                    begin=ft.Alignment(-1, -1), end=ft.Alignment(1, 1),
+                    colors=gradient_colors,
+                ),
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                blur=ft.Blur(15, 15),
+            )
+
+        def setting_row(label_key, control):
+            return ft.Row([
+                ft.Text(config.T(label_key), size=13, color="#ddffffff", expand=True),
+                control,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+
+        # ========= VISUALS SECTION =========
+        sw_fullscreen = ft.Switch(
+            value=config.SETTINGS["fullscreen"], active_color=accent,
+            on_change=lambda e: on_setting_change("fullscreen", e.control.value, apply_fullscreen)
+        )
+        sw_zen = ft.Switch(
+            value=config.SETTINGS["zen_intro"], active_color=accent,
+            on_change=lambda e: on_setting_change("zen_intro", e.control.value)
+        )
+
+        # Visual Quality as radio-style pills
+        quality_val = [config.SETTINGS["visual_quality"]]
+        def make_quality_pill(label_key, val, color):
+            is_active = quality_val[0] == val
+            c = ft.Container(
+                content=ft.Text(config.T(label_key), size=11, color="white" if is_active else "#88ffffff",
+                                weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL),
+                padding=ft.Padding(left=14, top=6, right=14, bottom=6),
+                border_radius=20,
+                bgcolor=color if is_active else ft.Colors.with_opacity(0.1, "white"),
+                border=ft.Border.all(1, color if is_active else "#33ffffff"),
+                ink=True,
+            )
+            def on_pick(e, v=val):
+                quality_val[0] = v
+                on_setting_change("visual_quality", v)
+                # Rebuild overlay
+                main_layout_stack.controls.pop()
+                safe_update(page)
+                open_settings_dialog(None)
+            c.on_click = on_pick
+            return c
+
+        quality_row = ft.Row([
+            make_quality_pill("low", "low", "#ff9800"),
+            make_quality_pill("medium", "medium", "#4caf50"),
+            make_quality_pill("high", "high", "#2196f3"),
+        ], spacing=8)
+
+        # FPS Slider
+        fps_map = {0: 30, 1: 60, 2: 120, 3: 0}
+        fps_labels = {30: "30", 60: "60", 120: "120", 0: config.T("unlimited")}
+        current_fps = config.SETTINGS.get("target_fps", 30)
+        fps_idx = {30: 0, 60: 1, 120: 2, 0: 3}.get(current_fps, 0)
+        fps_display = ft.Text(fps_labels.get(current_fps, "30"), size=13, color=accent, weight=ft.FontWeight.BOLD)
+
+        def on_fps_change(e):
+            idx = int(e.control.value)
+            fps = fps_map.get(idx, 30)
+            fps_display.value = fps_labels.get(fps, "30")
+            apply_fps(fps)
+            safe_update(fps_display)
+
+        fps_slider = ft.Slider(
+            min=0, max=3, divisions=3, value=fps_idx,
+            active_color=accent, inactive_color="#33ffffff", thumb_color="white",
+            on_change=on_fps_change, width=180,
+        )
+
+        visual_card = section_card(
+            assets.SVG_EYE, "#64B5F6", "sec_visuals",
+            [ft.Colors.with_opacity(0.15, "#1565C0"), ft.Colors.with_opacity(0.05, "#0D47A1")],
+            [
+                setting_row("fullscreen", sw_fullscreen),
+                setting_row("zen_intro", sw_zen),
+                ft.Row([ft.Text(config.T("visual_quality"), size=13, color="#ddffffff"), ft.Container(expand=True), quality_row]),
+                ft.Row([ft.Text(config.T("target_fps"), size=13, color="#ddffffff"), ft.Container(expand=True), fps_display]),
+                fps_slider,
+            ]
+        )
+
+        # ========= APP & LOCALIZATION SECTION =========
+        dd_language = ft.Dropdown(
+            value=config.SETTINGS["language"],
+            options=[
+                ft.dropdown.Option("EN"),
+                ft.dropdown.Option("FR"),
+                ft.dropdown.Option("ES"),
+                ft.dropdown.Option("AR"),
+            ],
+            width=100, height=42, text_size=13, color="white", border_color="#44ffffff",
+            bgcolor=ft.Colors.with_opacity(0.2, "black"), border_radius=12,
+        )
+        def on_lang_select(e):
+            apply_language(e.control.value)
+            # Rebuild the dialog with new language
+            main_layout_stack.controls.pop()
+            safe_update(page)
+            open_settings_dialog(None)
+        dd_language.on_select = on_lang_select
+
+        # Accent color picker
+        accent_colors = ["#00E5FF", "#FF9800", "#E040FB", "#69F0AE", "#FF5252", "#FFD740"]
+        def make_accent_dot(color):
+            is_selected = config.SETTINGS.get("accent_color", "#00E5FF") == color
+            return ft.Container(
+                width=32, height=32, border_radius=16,
+                bgcolor=color,
+                border=ft.Border.all(3, "white" if is_selected else "transparent"),
+                shadow=ft.BoxShadow(blur_radius=8, color=color) if is_selected else None,
+                ink=True,
+                on_click=lambda e, c=color: _pick_accent(c),
+            )
+        def _pick_accent(color):
+            apply_accent(color)
+            main_layout_stack.controls.pop()
+            safe_update(page)
+            open_settings_dialog(None)
+
+        accent_row = ft.Row([make_accent_dot(c) for c in accent_colors], spacing=8)
+
+        app_card = section_card(
+            assets.SVG_TUNE, "#CE93D8", "sec_app",
+            [ft.Colors.with_opacity(0.15, "#6A1B9A"), ft.Colors.with_opacity(0.05, "#4A148C")],
+            [
+                setting_row("language", dd_language),
+                ft.Text(config.T("accent_color"), size=13, color="#ddffffff"),
+                accent_row,
+            ]
+        )
+
+        # ========= DATA SECTION =========
+        txt_export = ft.Text(config.SETTINGS["export_folder"], size=12, color="#aaffffff", italic=True)
+        btn_reset = ft.Container(
+            content=ft.Row([
+                ft.Text(config.T("reset_all"), size=12, color="#ff6b6b", weight=ft.FontWeight.BOLD),
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            on_click=lambda e: confirm_reset(),
+            padding=ft.Padding(left=20, top=10, right=20, bottom=10),
+            border_radius=15,
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.3, "#ff6b6b")),
+            bgcolor=ft.Colors.with_opacity(0.1, "#ff6b6b"),
+            ink=True, width=200,
+        )
+
+        data_card = section_card(
+            assets.SVG_ARROW_DOWN, "#A5D6A7", "sec_data",
+            [ft.Colors.with_opacity(0.15, "#1B5E20"), ft.Colors.with_opacity(0.05, "#0D3B0F")],
+            [
+                setting_row("export_folder", txt_export),
+                ft.Container(height=5),
+                ft.Row([btn_reset], alignment=ft.MainAxisAlignment.CENTER),
+            ]
+        )
+
+        # ========= FULL MODAL LAYOUT =========
+        settings_body = ft.Column([
+            ft.Row([
+                # Left column: Visuals
+                ft.Column([visual_card], expand=True),
+                ft.Container(width=15),
+                # Right column: App + Data
+                ft.Column([app_card, ft.Container(height=15), data_card], expand=True),
+            ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.START),
+        ], scroll=ft.ScrollMode.AUTO, expand=True)
+
+        # Header bar
+        header_row = ft.Row([
+            get_ui_icon(assets.SVG_SETTINGS, color="white", size=24),
+            ft.Container(width=8),
+            ft.Text(config.T("settings"), size=22, weight=ft.FontWeight.BOLD, color="white"),
+            ft.Container(expand=True),
+            ft.Container(
+                content=ft.Text(config.T("close"), size=13, color="#aaffffff", weight=ft.FontWeight.BOLD),
+                on_click=close_settings,
+                padding=ft.Padding(left=20, top=8, right=20, bottom=8),
+                border_radius=20,
+                bgcolor=ft.Colors.with_opacity(0.15, "white"),
+                border=ft.Border.all(1, ft.Colors.with_opacity(0.2, "white")),
+                ink=True,
+            ),
+        ], alignment=ft.MainAxisAlignment.START)
 
         dialog_container = ft.Container(
             content=ft.Column([
-                ft.Row([
-                    get_ui_icon(assets.SVG_SETTINGS, color="white", size=20),
-                    ft.Text("SETTINGS", size=16, weight=ft.FontWeight.BOLD, color="white"),
-                ], spacing=10),
-                ft.Container(height=10),
-                settings_content,
-            ], width=350, spacing=0),
-            bgcolor="#222222",
-            border=ft.Border.all(1, "#44ffffff"),
-            border_radius=15,
-            padding=20,
-            shadow=ft.BoxShadow(blur_radius=20, color="black"),
-            alignment=ft.Alignment(0, 0)
+                header_row,
+                ft.Container(height=15),
+                settings_body,
+            ], expand=True),
+            width=700,
+            height=520,
+            bgcolor=ft.Colors.with_opacity(0.85, "#111118"),
+            border=ft.Border.all(1, ft.Colors.with_opacity(0.25, "white")),
+            border_radius=25,
+            padding=25,
+            blur=ft.Blur(20, 20),
+            shadow=ft.BoxShadow(blur_radius=40, spread_radius=-5, color=ft.Colors.with_opacity(0.5, "black")),
         )
 
         overlay = ft.Container(
             content=dialog_container,
-            bgcolor=ft.Colors.with_opacity(0.8, "black"),
+            bgcolor=ft.Colors.with_opacity(0.7, "black"),
             alignment=ft.Alignment(0, 0),
             expand=True,
-            ink=False
+            on_click=close_settings,
         )
 
         main_layout_stack.controls.append(overlay)
